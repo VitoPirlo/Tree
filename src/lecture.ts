@@ -21,7 +21,9 @@ export interface Verdict {
 export interface Ajout extends Omit<Pistes, "ref"> { famille: string; theme: string; titre: string; aQuoiCaSert: string }
 export interface Plan { depot: { presentation: string; regles: string }; cases: Pistes[]; ajouts: Ajout[] }
 
-export interface ContextePlan { description: string; familles: { titre: string; themes: string[] }[]; cases: CaseRef[]; chemins: string[]; docs: Texte[]; branches: string[]; fusions: DemandeFusion[] }
+export interface ContextePlan { description: string; familles: { titre: string; themes: string[] }[]; cases: CaseRef[]; chemins: string[]; docs: Texte[]; branches: string[]; fusions: DemandeFusion[];
+  /** Ce qu'une lecture précédente avait trouvé dans le dépôt sans que la description le demande : à renommer le moins possible. */
+  dejaTrouves: { famille: string; theme: string; titre: string }[] }
 export interface ContexteJugement {
   /** Ce qui est identique pour toutes les familles : mis en cache côté IA, payé une seule fois. */
   commun: { description: string; docs: Texte[]; chemins: string[] };
@@ -37,7 +39,7 @@ export interface IALecture {
 export interface Cache { lire(cle: string): string | null; ecrire(cle: string, valeur: string): void }
 
 // Change quand les consignes données à l'IA changent, pour ne pas resservir d'anciennes réponses.
-const VERSION = "lecture-3";
+const VERSION = "lecture-4";
 const MAX_AJOUTS = 8;
 const cleTitre = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 const MAX_CHEMINS = 2500, MAX_TAILLE = 200_000, MAX_ENVOI = 30_000, MAX_DOC = 6000;
@@ -86,7 +88,10 @@ export async function lireDepot(
   const docs = cheminsDocs.map((chemin) => ({ chemin, texte: couper(contenus.get(chemin)!, MAX_DOC) }));
 
   // Les cases trouvées dans le dépôt lors d'une lecture précédente sont reconstruites à chaque lecture.
+  const dejaTrouves: ContextePlan["dejaTrouves"] = [];
   for (const f of entree.arbre.familles) {
+    // On retient leur titre d'origine : si la chose existe toujours, elle doit garder le même nom d'une lecture à l'autre.
+    for (const t of f.themes) for (const c of t.cases) if (c.origine === "depot") dejaTrouves.push({ famille: f.titre, theme: t.titre, titre: c.corrige?.avant.titre ?? c.titre });
     for (const t of f.themes) t.cases = t.cases.filter((c) => c.origine !== "depot");
     f.themes = f.themes.filter((t) => t.cases.length);
   }
@@ -110,8 +115,8 @@ export async function lireDepot(
 
   progres("Repérage des endroits à lire pour chaque case…");
   const empreinteDepot = hache([info.sha, branches, fusions.map((f) => [f.numero, f.etat, f.titre])]);
-  const plan = await avecCache(cache, `plan:${hache([VERSION, empreinteDepot, pourIA, toutesRefs])}`, () =>
-    ia.planifier({ description: pourIA, familles: formeArbre, cases: toutesRefs, chemins: retenus.map((f) => f.chemin), docs, branches, fusions }));
+  const plan = await avecCache(cache, `plan:${hache([VERSION, empreinteDepot, pourIA, toutesRefs, dejaTrouves])}`, () =>
+    ia.planifier({ description: pourIA, familles: formeArbre, cases: toutesRefs, chemins: retenus.map((f) => f.chemin), docs, branches, fusions, dejaTrouves }));
   const pistes = new Map(plan.cases.map((p) => [p.ref, p]));
 
   // Ce que le dépôt fait et que la description ne dit pas : on l'ajoute à l'arbre, et il sera jugé comme le reste.

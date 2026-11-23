@@ -79,7 +79,7 @@ Pour chaque case, rends :
 
 Si rien dans le dépôt ne semble toucher à une case, laisse ses trois listes vides : c'est une information utile, pas un échec. Rends une entrée par case, avec sa référence.
 
-« ajouts » : ce que le dépôt fait pour ses utilisateurs et dont la description ne parle pas, ou qu'elle exclut. C'est précieux pour lui : il découvre ce qui a été construit sans qu'il le demande. Au plus 8, les plus significatifs, et seulement des services rendus visibles dans les fichiers ou les demandes de fusion, pas des détails techniques. Pour chacun : la famille (son titre exact), le thème (un titre existant de cette famille, ou un nouveau), un titre et un « à quoi ça sert » dans le même langage que les cases, et les mêmes trois listes. N'ajoute rien qui recoupe une case existante.
+« ajouts » : ce que le dépôt fait pour ses utilisateurs et dont la description ne parle pas, ou qu'elle exclut. C'est précieux pour lui : il découvre ce qui a été construit sans qu'il le demande. Au plus 8, les plus significatifs, et seulement des services rendus visibles dans les fichiers ou les demandes de fusion, pas des détails techniques. Pour chacun : la famille (son titre exact), le thème (un titre existant de cette famille, ou un nouveau), un titre et un « à quoi ça sert » dans le même langage que les cases, et les mêmes trois listes. N'ajoute rien qui recoupe une case existante. Si une lecture précédente avait déjà trouvé des ajouts, ils te sont rappelés : quand l'un d'eux existe toujours dans le dépôt, reprends exactement sa famille, son thème et son titre, pour qu'il garde le même nom d'une lecture à l'autre ; s'il n'existe plus, ne le rends pas.
 
 « depot » : « presentation » décrit le dépôt en une courte phrase pour un développeur qui le découvre (langages, grandes parties). « regles » reprend en un paragraphe les règles de travail écrites dans la documentation fournie (fichiers AGENTS.md, CONTRIBUTING.md, README) : comment créer une branche, ouvrir une demande de fusion, tester, ce qui est interdit ou réservé à quelqu'un. Seulement ce qui y est écrit : si la documentation ne donne aucune règle, laisse vide.`;
 
@@ -174,7 +174,7 @@ class IAAnthropic implements IA {
   planifier(c: ContextePlan) {
     const cases = c.cases.map((x) => `${x.ref} · ${x.titre} : ${x.aQuoiCaSert}`).join("\n");
     return this.appel(PlanIA, SYSTEME_PLAN,
-      `<description>\n${c.description}\n</description>\n\n<familles_et_themes>\n${c.familles.map((f) => `${f.titre} : ${f.themes.join(" ; ")}`).join("\n")}\n</familles_et_themes>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>`, "medium");
+      `<description>\n${c.description}\n</description>\n\n<familles_et_themes>\n${c.familles.map((f) => `${f.titre} : ${f.themes.join(" ; ")}`).join("\n")}\n</familles_et_themes>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>\n\n<ajouts_de_la_lecture_precedente>\n${c.dejaTrouves.map((a) => `${a.famille} · ${a.theme} · ${a.titre}`).join("\n") || "(aucun)"}\n</ajouts_de_la_lecture_precedente>`, "medium");
   }
 
   juger(c: ContexteJugement) {
