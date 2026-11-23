@@ -1,0 +1,32 @@
+/* Écrans hors carte : accueil, description, questions. Même langage visuel que la carte. */
+body.page{overflow:auto;background-image:radial-gradient(var(--dot) 1.2px,transparent 1.2px);background-size:24px 24px}
+.page main{max-width:720px;margin:0 auto;padding:28px 16px 64px;display:grid;gap:18px}
+.page h1{font-family:var(--display);font-size:26px;margin:0;line-height:1.15}
+.page h2{font-family:var(--display);font-size:17px;margin:0}
+.page p{margin:0;font-size:15px}
+.sub{color:var(--muted)}
+.panel{background:var(--bg);border:2.5px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 var(--ink);padding:18px;display:grid;gap:14px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--lock)}
+.steps b{color:var(--ink)} .steps span::after{content:"›";margin-left:6px;color:var(--lock)} .steps span:last-child::after{content:""}
+textarea,input[type=password]{font:inherit;font-size:16px;color:var(--ink);width:100%;border:2px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg);resize:vertical}
+textarea:focus,input:focus{outline:none;border-color:var(--ink)}
+textarea.big{min-height:260px}
+label{display:grid;gap:6px;font-weight:600;font-size:15px}
+label small{font-weight:400;color:var(--muted);font-size:13px}
+.btn{justify-self:start;border:2px solid var(--ink);background:var(--ink);color:#fff;border-radius:12px;padding:10px 18px;font-family:var(--display);font-weight:700;font-size:15px;box-shadow:0 4px 0 #000}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #000}
+.btn[disabled]{opacity:.55;cursor:wait}
+.btn.ghost{background:var(--bg);color:var(--ink);box-shadow:0 4px 0 var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.err{background:var(--drift-soft);border-left:3px solid var(--drift);padding:8px 10px;border-radius:6px;font-size:14px}
+.note{background:#fff8e1;border-left:3px solid #f0a500;padding:8px 10px;border-radius:6px;font-size:14px}
+.list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.list a{display:flex;justify-content:space-between;gap:10px;align-items:center;text-decoration:none;color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:600;box-shadow:0 3px 0 var(--line);background:var(--bg)}
+.list a:hover{border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+.list a small{font-weight:400;color:var(--muted)}
+.wait{display:flex;gap:10px;align-items:center;color:var(--muted)}
+.wait::before{content:"";width:18px;height:18px;border-radius:50%;border:3px solid var(--dot);border-top-color:var(--ink);animation:spin 1s linear infinite}
+/* sur la carte */
+a.chip{text-decoration:none;color:var(--ink)}
+.chip.demo{border-color:#f0a500;box-shadow:0 3px 0 #f0a500;font-weight:600}
+.card blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--fc);background:var(--ft);border-radius:6px;font-size:13.5px}
