@@ -35,6 +35,12 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     return recu.length === jeton.length && timingSafeEqual(Buffer.from(recu), Buffer.from(jeton));
   };
 
+  // Un seul mot de passe protège tout : on ralentit celui qui essaie de le deviner. Dix erreurs, puis un quart d'heure d'attente.
+  const echecs = new Map<string, { n: number; debut: number }>();
+  const QUART_HEURE = 15 * 60_000, MAX_ECHECS = 10;
+  const origine = (req: http.IncomingMessage) => String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || req.socket.remoteAddress || "inconnue";
+  const bloque = (qui: string) => { const e = echecs.get(qui); if (e && Date.now() - e.debut > QUART_HEURE) echecs.delete(qui); return (echecs.get(qui)?.n ?? 0) >= MAX_ECHECS; };
+
   // Lectures de dépôt en cours. Elles durent plusieurs minutes : le navigateur vient demander où on en est.
   const lectures = new Map<string, Lecture>();
   /** Ce que le navigateur reçoit d'un projet : ni la description, ni le jeton GitHub. */
@@ -65,7 +71,14 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     if (chemin === "/api/etat" && m === "GET") return { connecte: connecte(req), modeDemo: ia.modeDemo, descriptionDemo: ia.modeDemo ? DESCRIPTION_DEMO : null };
     if (chemin === "/api/connexion" && m === "POST") {
       const { motDePasse: essai } = await corps(req);
-      if (!motDePasse || essai !== motDePasse) throw new ErreurHttp(401, "Mot de passe incorrect.");
+      const qui = origine(req);
+      if (bloque(qui)) throw new ErreurHttp(429, "Trop d'essais. Réessayez dans un quart d'heure.");
+      if (!motDePasse || essai !== motDePasse) {
+        const e = echecs.get(qui) ?? { n: 0, debut: Date.now() };
+        e.n++; echecs.set(qui, e);
+        throw new ErreurHttp(401, "Mot de passe incorrect.");
+      }
+      echecs.delete(qui);
       const sur = req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
       res.setHeader("Set-Cookie", `carte=${jeton}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${sur}`);
       return { connecte: true };

@@ -143,3 +143,14 @@ test("serveur : sans le mot de passe on ne lit rien, et le parcours mise à jour
     assert.equal(trouver(p.arbre, "Payer en ligne").etat, "wip");
   } finally { serveur.close(); serveur.closeAllConnections(); }
 });
+
+test("serveur : après dix mots de passe faux, il faut attendre, même avec le bon", async () => {
+  const serveur = creerServeur(ouvrirBase(":memory:"), iaDemo, "secret");
+  await new Promise<void>((pret) => serveur.listen(0, "127.0.0.1", pret));
+  const essai = async (motDePasse: string) => (await fetch(`http://127.0.0.1:${(serveur.address() as AddressInfo).port}/api/connexion`, { method: "POST", body: JSON.stringify({ motDePasse }) })).status;
+  try {
+    for (let i = 0; i < 10; i++) assert.equal(await essai("faux"), 401);
+    assert.equal(await essai("faux"), 429);
+    assert.equal(await essai("secret"), 429);
+  } finally { serveur.close(); serveur.closeAllConnections(); }
+});

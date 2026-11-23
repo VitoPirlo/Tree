@@ -1,0 +1,17 @@
+# Mise en ligne sur Render (render.com). Render lit ce fichier et demande les deux valeurs secrètes.
+services:
+  - type: web
+    name: carte-produit
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /api/etat
+    disk:
+      name: donnees
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: CARTE_ANTHROPIC_API_KEY
+        sync: false
