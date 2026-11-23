@@ -37,10 +37,10 @@ export interface IALecture {
 export interface Cache { lire(cle: string): string | null; ecrire(cle: string, valeur: string): void }
 
 // Change quand les consignes données à l'IA changent, pour ne pas resservir d'anciennes réponses.
-const VERSION = "lecture-2";
+const VERSION = "lecture-3";
 const MAX_AJOUTS = 8;
 const cleTitre = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-const MAX_CHEMINS = 2500, MAX_TAILLE = 200_000, MAX_ENVOI = 8000, MAX_DOC = 6000;
+const MAX_CHEMINS = 2500, MAX_TAILLE = 200_000, MAX_ENVOI = 30_000, MAX_DOC = 6000;
 const FICHIERS_PAR_CASE = 4, FICHIERS_PAR_FAMILLE = 30;
 const IGNORES = /(^|\/)(node_modules|vendor|dist|build|\.git|\.next|__pycache__|\.venv|venv|coverage)\//;
 const ILLISIBLES = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|woff2?|ttf|eot|mp[34]|mov|lock|min\.js|map|sqlite|bin)$|(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock)$/i;
