@@ -31,8 +31,21 @@ const part = (a, b) => (b ? (a / b) * 100 : 0);
 const PER = 5, SW = 168, SH = 58, SX = 186, ROWH = 74, FGAP = 34;
 const RX = 20, RS = 150, TOP = 84, TRUNK = RX + RS + 30, FX = TRUNK + 30, FW = 216, FH = 74, BUS = FX + FW + 22, GX = BUS + 20, GW = 132, GH = 30, STX = GX + GW + 28;
 
-export function monterCarte(racine, projet, { modeDemo }) {
-  const arbre = projet.arbre, F = arbre.familles;
+const dateFr = (d) => { const [a, m, j] = String(d).slice(0, 10).split("-"); return `${j}/${m}/${a}`; };
+const nomCourt = (chemin) => chemin.split("/").slice(-2).join("/");
+
+/** Les preuves contrôlées d'une case, pour le volet replié « Où regarder dans le dépôt ». */
+function listePreuves(n) {
+  if (!n.preuves?.length) return "";
+  const li = n.preuves.map((p) => p.type === "fusion"
+    ? `<li><span>Demande de fusion n° ${p.numero} · ${esc(p.titre)} <i>${esc(p.auteur)} · ${p.etat === "fusionnee" ? "fusionnée" : "ouverte"} le ${dateFr(p.date)}</i></span></li>`
+    : p.type === "branche" ? `<li><span>Branche en chantier : ${esc(p.nom)}</span></li>`
+    : `<li><span>${p.type === "test" ? "Test" : "Fichier"} : ${esc(p.chemin)}</span></li>`).join("");
+  return `<details class="ev"><summary>Où regarder dans le dépôt (${n.preuves.length} preuve${n.preuves.length > 1 ? "s" : ""} vérifiée${n.preuves.length > 1 ? "s" : ""})</summary><ul style="margin-top:6px">${li}</ul></details>`;
+}
+
+export function monterCarte(racine, projet, { modeDemo, api }) {
+  let arbre = projet.arbre, F = arbre.familles;
   document.body.className = "";
   racine.innerHTML = `
     <div id="board" aria-label="Arbre du produit ${esc(arbre.produit.nom)}"><div id="layer"></div></div>
@@ -45,6 +58,7 @@ export function monterCarte(racine, projet, { modeDemo }) {
         <div class="chip k"><i class="lg t"></i><b id="c3"></b> à débloquer</div>
         ${projet.demo ? '<div class="chip demo">Exemple de démonstration</div>' : ""}
       </div>
+      <button class="tg depot" id="gh"></button>
     </div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
@@ -82,7 +96,7 @@ export function monterCarte(racine, projet, { modeDemo }) {
             else { const ex = GX + GW + 14; lines += `<path class="ln ${n.etat}" d="M${ex} ${gcy} V${cy - 12} Q${ex} ${cy} ${ex + 12} ${cy} H${x}"/>`; }
           } else lines += `<path class="ln ${n.etat}" d="M${x - (SX - SW)} ${cy} H${x}"/>`;
           const key = `s${fi}-${gi}-${n.i}`;
-          html += `<button class="nd st ${n.etat}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span></button>`;
+          html += `<button class="nd st ${n.etat}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span>${n.nonVerifie ? '<i class="fl nv" title="Non vérifié">?</i>' : ""}</button>`;
         });
         gy += Math.ceil(steps.length / PER) * ROWH + 6;
       });
@@ -107,7 +121,22 @@ export function monterCarte(racine, projet, { modeDemo }) {
       const le = new Date(projet.creeLe).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
       h += `<span class="ey">Le produit</span><h2>${esc(arbre.produit.nom)}</h2><p>${esc(arbre.produit.resume)}</p>
         <p class="ev">${g.done} cases débloquées, ${g.wip} en cours, ${g.todo} à débloquer, ${g.later} prévues après cette version.</p>
-        <p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`;
+        ${projet.depot?.sha
+          ? `<p class="ev">Carte établie à partir de votre description et du dépôt ${esc(projet.depot.nom)} (branche ${esc(projet.depot.brancheDefaut)} au ${dateFr(projet.depot.dateDernierCommit)}), lu le ${dateFr(projet.depot.luLe)}. « Débloqué » veut dire construit et testé, pas encore éprouvé en production. Les cases à débloquer sont des propositions de l'outil, déduites de votre description.</p>${projet.depot.fichiersIgnores ? `<p class="ev">Dépôt très volumineux : ${projet.depot.fichiersIgnores} fichiers n'ont pas été pris en compte.</p>` : ""}`
+          : `<p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}`;
+    } else if (sel === "depot") {
+      const l = projet.lecture, d = projet.depot;
+      h += `<span class="ey">Dépôt GitHub · lecture seule</span>`;
+      if (l?.enCours) h += `<h2>Lecture en cours</h2><p class="wait">${esc(l.message)}</p><p class="ev">Cela prend quelques minutes. Vous pouvez laisser cette page ouverte.</p>`;
+      else if (d?.sha) h += `<h2>${esc(d.nom)}</h2><p>Branche ${esc(d.brancheDefaut)}, dernière modification le ${dateFr(d.dateDernierCommit)}. Lu le ${dateFr(d.luLe)}.</p>
+        ${d.ecriturePossible ? '<p class="dr"><b>Jeton trop large.</b> Ce jeton permet aussi d\'écrire dans le dépôt. L\'outil ne le fait jamais, mais un jeton en lecture seule est plus sûr.</p>' : '<p class="ev">L\'outil ne fait que lire : il ne peut rien modifier dans votre dépôt.</p>'}`;
+      else h += `<h2>Connecter votre dépôt</h2>${l?.erreur ? `<p class="dr"><b>Lecture interrompue.</b> ${esc(l.erreur)}</p>` : ""}
+        ${projet.demo ? '<p>En mode démonstration, l\'outil lit un dépôt d\'exemple fourni avec lui.</p>' : `
+        <p>L'outil lit votre dépôt pour vérifier, case par case, ce qui est réellement construit. Il ne peut rien y modifier.</p>
+        <label>Dépôt<input id="gh-depot" placeholder="proprietaire/nom" value="${esc(d?.nom ?? "")}" autocomplete="off"></label>
+        <label>Jeton en lecture seule<input id="gh-jeton" type="password" autocomplete="off"><small>Laissez vide pour un dépôt public.</small></label>
+        <details class="ev"><summary>Comment créer ce jeton</summary><p style="margin-top:6px">Sur GitHub : Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token. Choisissez « Only select repositories » et votre dépôt, puis dans « Repository permissions » mettez <b>Contents</b> et <b>Pull requests</b> sur « Read-only ». Rien d'autre.</p></details>`}
+        <div id="gh-msg"></div><button class="cp" id="gh-go">${projet.demo ? "Lire le dépôt d'exemple" : "Connecter et lire le dépôt"}</button>`;
     } else if (sel[0] === "f") {
       const fi = +sel.slice(1), f = F[fi], c = stat(toutes(f));
       h += `<span class="ey">Famille${f.responsable ? " · " + esc(f.responsable) : ""}</span><h2>${esc(f.titre)}</h2><p>${esc(f.description)}</p>
@@ -117,16 +146,26 @@ export function monterCarte(racine, projet, { modeDemo }) {
       h += "</ul>";
     } else {
       const [fi, gi, ni] = sel.slice(1).split("-").map(Number), f = F[fi], n = f.themes[gi].cases[ni];
-      h += `<span class="ey">${esc(f.titre)} · ${esc(f.themes[gi].titre)}</span><h2>${esc(n.titre)}</h2><span class="tag ${n.etat}">${LABEL[n.etat]}</span>
+      h += `<span class="ey">${esc(f.titre)} · ${esc(f.themes[gi].titre)}</span><h2>${esc(n.titre)}</h2><span class="row-tags"><span class="tag ${n.etat}">${LABEL[n.etat]}</span>${n.nonVerifie ? '<span class="tag todo">Non vérifié</span>' : ""}</span>
         <div><span class="lb">À quoi ça sert</span><p>${esc(n.aQuoiCaSert)}</p></div>
         <div><span class="lb">Où on en est</span><p>${esc(n.ouOnEnEst)}</p></div>
         ${n.citation ? `<div><span class="lb">D'après votre description</span><blockquote>« ${esc(n.citation)} »</blockquote></div>` : ""}
-        ${n.etat === "todo" ? '<p class="ev">Proposition de l\'outil, déduite de votre description. Elle sera vérifiée dans le dépôt quand il sera connecté.</p>' : ""}`;
+        ${n.etat === "done" ? `<p class="ev">« Débloqué » veut dire construit${n.teste ? " et testé" : ""}, pas encore éprouvé en production.</p>` : ""}
+        ${n.etat === "todo" ? `<p class="ev">Proposition de l'outil, déduite de votre description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>` : ""}
+        ${listePreuves(n)}`;
     }
     const fam = sel[0] === "f" || sel[0] === "s" ? COULEURS[parseInt(sel.slice(1)) % COULEURS.length] : null;
     el.style.setProperty("--fc", fam ? fam[0] : "#1b1f2a"); el.style.setProperty("--ft", fam ? fam[1] : "#f2f4f7");
     el.innerHTML = h; el.hidden = false;
     el.querySelector(".x").onclick = () => { sel = null; render(); };
+    const go = el.querySelector("#gh-go");
+    if (go) go.onclick = async () => {
+      go.disabled = true;
+      try {
+        projet = await api(`/projets/${projet.id}/depot`, { depot: el.querySelector("#gh-depot")?.value ?? "", jeton: el.querySelector("#gh-jeton")?.value ?? "" });
+        suivre(); render();
+      } catch (e) { go.disabled = false; el.querySelector("#gh-msg").innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
+    };
     el.querySelectorAll("[data-go]").forEach((x) => (x.onclick = () => { sel = x.dataset.go; render(); center(sel); }));
   }
 
@@ -137,7 +176,7 @@ export function monterCarte(racine, projet, { modeDemo }) {
     const bw = board.clientWidth, bh = board.clientHeight;
     const fw = Math.min(bw / (W + 16), 1), fa = Math.min(fw, (bh - 130) / H);
     s = whole ? fa : Math.max(fw, 0.6);
-    tx = Math.max((bw - W * s) / 2, 8); ty = 64 - TOP * s + 10; apply();
+    tx = Math.max((bw - W * s) / 2, 8); ty = racine.querySelector(".top").offsetHeight + 22 - TOP * s + 10; apply();
   }
   function zoomAt(f, cx, cy) { const ns = Math.min(2, Math.max(0.3, s * f)); tx = cx - (cx - tx) * ns / s; ty = cy - (cy - ty) * ns / s; s = ns; apply(); }
   function center(k) {
@@ -160,6 +199,31 @@ export function monterCarte(racine, projet, { modeDemo }) {
   $("#zi").onclick = () => zoomAt(1.2, board.clientWidth / 2, board.clientHeight / 2);
   $("#zo").onclick = () => zoomAt(1 / 1.2, board.clientWidth / 2, board.clientHeight / 2);
   $("#zf").onclick = () => fit(true);
-  function render() { build(); card(); }
+  /* le bouton du dépôt, et le suivi d'une lecture en cours */
+  function bouton() {
+    const b = $("#gh"), l = projet.lecture;
+    b.className = "tg depot" + (l?.enCours ? " lit" : projet.depot?.sha ? " ok" : "");
+    b.innerHTML = l?.enCours ? `<i class="lg w"></i><span>${esc(l.message)}</span>` : projet.depot?.sha ? `<span>Dépôt ${esc(projet.depot.nom)}</span>` : `<span>Connecter GitHub</span>`;
+    b.setAttribute("aria-pressed", sel === "depot");
+  }
+  $("#gh").onclick = () => { sel = sel === "depot" ? null : "depot"; render(); };
+  let minuterie = 0;
+  function suivre() {
+    clearTimeout(minuterie);
+    if (!projet.lecture?.enCours) return;
+    minuterie = setTimeout(async () => {
+      if (!racine.contains(board)) return; // on a quitté la carte
+      try {
+        const frais = await api(`/projets/${projet.id}`);
+        const fini = !frais.lecture?.enCours;
+        projet = frais; arbre = projet.arbre; F = arbre.familles;
+        if (fini && sel === "depot" && !frais.lecture?.erreur) sel = "root";
+        render();
+      } catch { /* on réessaie au tour suivant */ }
+      suivre();
+    }, 1500);
+  }
+  function render() { build(); card(); bouton(); }
+  suivre();
   render(); fit(false);
 }

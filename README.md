@@ -6,7 +6,7 @@ on décrit son projet, l'outil en tire un arbre, puis le remplit à partir du d�
 ## État d'avancement
 
 - Étape 1 (faite) : description → questions → arbre vide, affiché comme le prototype.
-- Étape 2 : connexion GitHub en lecture seule, états et preuves.
+- Étape 2 (faite) : connexion GitHub en lecture seule, états et preuves.
 - Étape 3 : fiches complètes, écarts, prompts.
 - Étape 4 : mise à jour, résumé des changements, corrections à la main.
 
@@ -35,6 +35,9 @@ npm run check
 
 - `reference/` : le prototype fait à la main, référence du rendu et du langage.
 - `src/arbre.ts` : la forme de l'arbre et les règles qui décident de ce qui est affiché (testé).
-- `src/ia.ts` : les deux appels à l'IA (questions, arbre).
+- `src/etats.ts` : le contrôle des preuves et la décision des états (testé). L'IA propose, ce fichier décide.
+- `src/github.ts` : la lecture du dépôt GitHub, en lecture seule.
+- `src/lecture.ts` : l'enchaînement qui lit le dépôt et remplit l'arbre, avec cache.
+- `src/ia.ts` : les appels à l'IA (questions, arbre, repérage, avis sur les cases).
 - `src/serveur.ts`, `src/base.ts` : le serveur et le stockage (un fichier SQLite).
 - `public/` : les écrans. `carte.js` et `carte.css` reprennent le prototype.

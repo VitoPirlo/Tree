@@ -30,3 +30,14 @@ label small{font-weight:400;color:var(--muted);font-size:13px}
 a.chip{text-decoration:none;color:var(--ink)}
 .chip.demo{border-color:#f0a500;box-shadow:0 3px 0 #f0a500;font-weight:600}
 .card blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--fc);background:var(--ft);border-radius:6px;font-size:13.5px}
+.tg.depot{border-color:var(--ink);color:var(--ink);box-shadow:0 3px 0 var(--ink);max-width:100%}
+.tg.depot.ok{border-color:#2f9e44;color:#2b8a3e;box-shadow:0 3px 0 #2f9e44}
+.tg.depot.lit{border-color:var(--line);color:var(--muted);box-shadow:0 3px 0 var(--line);font-weight:500}
+.tg.depot.lit .lg.w{animation:spin 1s linear infinite;flex:none}
+.tg.depot[aria-pressed="true"]{background:var(--bg);color:inherit;transform:translateY(2px)}
+.fl.nv{background:var(--muted)}
+.row-tags{display:flex;flex-wrap:wrap;gap:6px}
+.card label{font-size:13.5px}
+.card input{font:inherit;font-size:16px;width:100%;border:2px solid var(--line);border-radius:10px;padding:8px 10px}
+.card .wait{font-size:14.5px}
+.fl.nv{font-style:normal}

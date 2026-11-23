@@ -2,6 +2,7 @@
 // Tout ce qui décide d'un état ou d'une citation affichée passe par ce fichier, qui est testé.
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import type { Preuve } from "./etats.ts";
 
 export const EMBLEMES = [
   "donnees", "cerveau", "courrier", "ecran", "serveur", "outil",
@@ -46,6 +47,14 @@ export interface Case {
   etat: Etat;
   /** Phrase de la description dont la case découle, seulement si elle s'y trouve vraiment. */
   citation: string | null;
+  /** État tiré de la description seule. Sert de repli quand le dépôt ne prouve rien. */
+  base: Etat;
+  /** Vrai quand l'outil n'a pas pu trancher : la fiche l'annonce. */
+  nonVerifie: boolean;
+  /** Pour une case débloquée : un test a-t-il été trouvé ? */
+  teste: boolean;
+  /** Preuves contrôlées dans le dépôt. */
+  preuves: Preuve[];
 }
 export interface Theme { id: string; titre: string; cases: Case[] }
 export interface Famille {
@@ -114,6 +123,7 @@ export function normaliserArbre(brut: ArbreIA, description: string): Arbre {
         cases.push({
           id: id(), titre, aQuoiCaSert: propre(c.aQuoiCaSert), ouOnEnEst: regle.texte,
           etat: regle.etat, citation: citationVerifiee(c.citation, description),
+          base: regle.etat, nonVerifie: false, teste: false, preuves: [],
         });
       }
       if (cases.length) themes.push({ id: id(), titre: titrePropre(t.titre, 40), cases });

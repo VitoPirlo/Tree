@@ -54,7 +54,7 @@ function ecranDecrire() {
 
 function ecranPreciser(projet) {
   const generer = (bouton, reponses) => lancer(bouton, "L'arbre se dessine… Cela peut prendre une à deux minutes.", async () => {
-    monterCarte(vue, await api(`/projets/${projet.id}/reponses`, { reponses }), etat);
+    monterCarte(vue, await api(`/projets/${projet.id}/reponses`, { reponses }), { ...etat, api });
   });
   if (!projet.questions.length) {
     page(`${etapes(1)}<h1>Aucune question</h1><p class="sub">Votre description suffit pour dessiner l'arbre.</p><div class="panel"><div id="msg"></div><button class="btn" id="go">Générer l'arbre</button></div>`);
@@ -79,7 +79,7 @@ async function route() {
     const m = /^#\/p\/([\w-]+)$/.exec(h);
     if (m) {
       const projet = await api("/projets/" + m[1]);
-      return projet.etape === "arbre" ? monterCarte(vue, projet, etat) : ecranPreciser(projet);
+      return projet.etape === "arbre" ? monterCarte(vue, projet, { ...etat, api }) : ecranPreciser(projet);
     }
     await ecranProjets();
   } catch (e) {

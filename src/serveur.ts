@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url";
 import { normaliserArbre, normaliserQuestions } from "./arbre.ts";
 import { ouvrirBase, type Base, type Projet } from "./base.ts";
 import { creerIA, ErreurIA, type IA } from "./ia.ts";
-import { DESCRIPTION_DEMO } from "./demo.ts";
+import { DEPOT_DEMO, DESCRIPTION_DEMO } from "./demo.ts";
+import { DepotGitHub, ErreurDepot, lireNomDepot, type Depot } from "./github.ts";
+import { lireDepot } from "./lecture.ts";
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
@@ -22,8 +24,7 @@ async function corps(req: http.IncomingMessage): Promise<any> {
   try { return JSON.parse(Buffer.concat(morceaux).toString("utf8") || "{}"); } catch { throw new ErreurHttp(400, "Demande illisible."); }
 }
 
-/** Ce que le navigateur reçoit d'un projet. La description n'est renvoyée que pour l'afficher à son auteur. */
-const vue = (p: Projet) => ({ id: p.id, nom: p.nom, etape: p.etape, questions: p.questions, arbre: p.arbre, demo: p.demo, creeLe: p.creeLe });
+interface Lecture { enCours: boolean; message: string; erreur: string | null }
 
 export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PASSWORD ?? "") {
   const jeton = motDePasse ? createHmac("sha256", motDePasse).update("carte-produit").digest("hex") : "";
@@ -31,6 +32,28 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     if (!motDePasse) return true;
     const recu = /(?:^|;\s*)carte=([0-9a-f]+)/.exec(req.headers.cookie ?? "")?.[1] ?? "";
     return recu.length === jeton.length && timingSafeEqual(Buffer.from(recu), Buffer.from(jeton));
+  };
+
+  // Lectures de dépôt en cours. Elles durent plusieurs minutes : le navigateur vient demander où on en est.
+  const lectures = new Map<string, Lecture>();
+  /** Ce que le navigateur reçoit d'un projet : ni la description, ni le jeton GitHub. */
+  const vue = (p: Projet) => ({ id: p.id, nom: p.nom, etape: p.etape, questions: p.questions, arbre: p.arbre, demo: p.demo, creeLe: p.creeLe, depot: p.depot, lecture: lectures.get(p.id) ?? null });
+
+  function lancerLecture(projet: Projet, depot: Depot) {
+    if (lectures.get(projet.id)?.enCours || !projet.arbre) return;
+    const suivi: Lecture = { enCours: true, message: "Connexion au dépôt…", erreur: null };
+    lectures.set(projet.id, suivi);
+    lireDepot({ description: projet.description, arbre: projet.arbre }, depot, ia, base.cache, (m) => { suivi.message = m; })
+      .then((r) => { base.enregistrerLecture(projet.id, r); lectures.delete(projet.id); })
+      .catch((e) => {
+        suivi.enCours = false;
+        suivi.erreur = e instanceof ErreurDepot || e instanceof ErreurIA ? e.message : "La lecture du dépôt a échoué. Réessayez.";
+        if (!(e instanceof ErreurDepot || e instanceof ErreurIA)) console.error("lecture interrompue :", e instanceof Error ? e.name : "inconnue");
+      });
+  }
+  const depotDe = (projet: Projet): Depot | null => {
+    if (!projet.depot) return null;
+    return projet.demo ? DEPOT_DEMO : new DepotGitHub(projet.depot.nom, base.jeton(projet.id) ?? "");
   };
 
   async function api(req: http.IncomingMessage, res: http.ServerResponse, chemin: string): Promise<unknown> {
@@ -53,13 +76,32 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       const questions = normaliserQuestions(await ia.poserQuestions(description));
       return vue(base.creer(description, questions, ia.modeDemo));
     }
-    const un = /^\/api\/projets\/([\w-]+)(\/reponses)?$/.exec(chemin);
+    const un = /^\/api\/projets\/([\w-]+)(\/reponses|\/depot|\/lecture)?$/.exec(chemin);
     if (un) {
       const projet = base.trouver(un[1]);
       if (!projet) throw new ErreurHttp(404, "Projet introuvable.");
       if (!un[2] && m === "GET") return vue(projet);
       if (!un[2] && m === "DELETE") { base.supprimer(projet.id); return { supprime: true }; }
-      if (un[2] && m === "POST") {
+      if (un[2] === "/depot" && m === "POST") {
+        if (projet.etape !== "arbre") throw new ErreurHttp(400, "Générez d'abord l'arbre.");
+        const recu = await corps(req);
+        if (projet.demo) base.connecterDepot(projet.id, "exemple/roule", "");
+        else {
+          const nom = lireNomDepot(String(recu.depot ?? "")), jeton = String(recu.jeton ?? "").trim();
+          await new DepotGitHub(nom, jeton).info(); // vérifie tout de suite que le dépôt est lisible avec ce jeton
+          base.connecterDepot(projet.id, nom, jeton);
+        }
+        const connecte = base.trouver(projet.id)!;
+        lancerLecture(connecte, depotDe(connecte)!);
+        return vue(connecte);
+      }
+      if (un[2] === "/lecture" && m === "POST") {
+        const depot = depotDe(projet);
+        if (!depot) throw new ErreurHttp(400, "Aucun dépôt n'est connecté à ce projet.");
+        lancerLecture(projet, depot);
+        return vue(projet);
+      }
+      if (un[2] === "/reponses" && m === "POST") {
         const recues = (await corps(req)).reponses;
         const reponses = projet.questions.map((_, i) => String(Array.isArray(recues) ? recues[i] ?? "" : "").slice(0, 2000));
         const brut = await ia.genererArbre(projet.description, projet.questions.map((question, i) => ({ question, reponse: reponses[i] })));
@@ -83,8 +125,8 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
         res.writeHead(200, { "Content-Type": TYPES[path.extname(fichier)] ?? "application/octet-stream", "Cache-Control": "no-cache" }).end(contenu);
       }
     } catch (e) {
-      const code = e instanceof ErreurHttp ? e.code : e instanceof ErreurIA ? 502 : 500;
-      const message = e instanceof ErreurHttp || e instanceof ErreurIA ? e.message : "Erreur inattendue. Réessayez.";
+      const code = e instanceof ErreurHttp ? e.code : e instanceof ErreurIA ? 502 : e instanceof ErreurDepot ? 400 : 500;
+      const message = e instanceof ErreurHttp || e instanceof ErreurIA || e instanceof ErreurDepot ? e.message : "Erreur inattendue. Réessayez.";
       if (code === 500) console.error("erreur interne :", e instanceof Error ? e.name : "inconnue");
       res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ erreur: message }));
     }
