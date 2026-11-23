@@ -125,9 +125,12 @@ const lignesFusions = (c: { fusions: ContextePlan["fusions"] }, corps: boolean) 
 const blocFichiers = (fs: { chemin: string; texte: string }[]) =>
   fs.map((f) => `<fichier chemin="${f.chemin}">\n${f.texte}\n</fichier>`).join("\n") || "(aucun)";
 
+/** La clé peut porter un nom propre à l'outil : certains hébergements ne transmettent pas ANTHROPIC_API_KEY aux programmes. */
+const cleOutil = () => process.env.CARTE_ANTHROPIC_API_KEY || undefined;
+
 class IAAnthropic implements IA {
   modeDemo = false;
-  private client = new Anthropic();
+  private client = cleOutil() ? new Anthropic({ apiKey: cleOutil() }) : new Anthropic();
 
   /** « commun » est la partie du message identique d'un appel à l'autre : elle est mise en cache côté IA. */
   private async appel<S extends z.ZodType>(schema: S, systeme: string, message: string, effort: "medium" | "high", commun?: string): Promise<z.infer<S>> {
@@ -200,5 +203,5 @@ class IADemo implements IA {
 }
 
 export function creerIA(): IA {
-  return process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new IAAnthropic() : new IADemo();
+  return cleOutil() || process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new IAAnthropic() : new IADemo();
 }

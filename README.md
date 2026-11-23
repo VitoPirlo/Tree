@@ -21,7 +21,7 @@ Puis ouvrir http://localhost:3000.
 
 Réglages, lus dans l'environnement et jamais écrits dans le code :
 
-- `ANTHROPIC_API_KEY` : la clé de l'IA. Sans elle, l'outil tourne en mode démonstration avec un exemple fixe.
+- `ANTHROPIC_API_KEY` (ou `CARTE_ANTHROPIC_API_KEY`, prioritaire, si l'hébergement ne transmet pas la première) : la clé de l'IA. Sans elle, l'outil tourne en mode démonstration avec un exemple fixe.
 - `APP_PASSWORD` : mot de passe d'accès. À définir dès que l'outil est en ligne.
 - `PORT` (3000 par défaut) et `DATA_DIR` (dossier du fichier de données, `data` par défaut).
 
