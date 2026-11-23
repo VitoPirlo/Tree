@@ -12,6 +12,8 @@ export type DepotConnecte = { nom: string } & Partial<ResultatLecture["depot"]>;
 export interface Projet {
   id: string; nom: string; description: string; etape: "questions" | "arbre";
   questions: Question[]; reponses: string[]; arbre: Arbre | null; demo: boolean; creeLe: string;
+  /** Ce que l'utilisateur a écrit avec ses mots pour dire ce qui n'allait pas dans l'arbre. */
+  remarques: string[];
   depot: DepotConnecte | null;
 }
 
@@ -23,6 +25,8 @@ export function ouvrirBase(fichier?: string) {
     id TEXT PRIMARY KEY, nom TEXT NOT NULL, description TEXT NOT NULL, etape TEXT NOT NULL,
     questions TEXT NOT NULL, reponses TEXT NOT NULL, arbre TEXT, demo INTEGER NOT NULL, cree_le TEXT NOT NULL)`);
 
+  // Colonne ajoutée après coup : les bases déjà en service ne l'ont pas.
+  try { db.exec("ALTER TABLE projets ADD COLUMN remarques TEXT"); } catch { /* elle existe déjà */ }
   db.exec(`CREATE TABLE IF NOT EXISTS depots (projet_id TEXT PRIMARY KEY, nom TEXT NOT NULL, jeton TEXT NOT NULL, info TEXT)`);
   db.exec(`CREATE TABLE IF NOT EXISTS cache (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)`);
 
@@ -33,7 +37,7 @@ export function ouvrirBase(fichier?: string) {
   const lire = (r: any): Projet => ({
     depot: depotDe(r.id),
     id: r.id, nom: r.nom, description: r.description, etape: r.etape,
-    questions: JSON.parse(r.questions), reponses: JSON.parse(r.reponses),
+    questions: JSON.parse(r.questions), reponses: JSON.parse(r.reponses), remarques: r.remarques ? JSON.parse(r.remarques) : [],
     arbre: r.arbre ? JSON.parse(r.arbre) : null, demo: !!r.demo, creeLe: r.cree_le,
   });
 
@@ -46,8 +50,8 @@ export function ouvrirBase(fichier?: string) {
       return r ? lire(r) : null;
     },
     creer(description: string, questions: Question[], demo: boolean): Projet {
-      const p: Projet = { id: randomUUID().slice(0, 12), nom: "Nouveau projet", description, etape: "questions", questions, reponses: [], arbre: null, demo, creeLe: new Date().toISOString(), depot: null };
-      db.prepare("INSERT INTO projets VALUES (?,?,?,?,?,?,?,?,?)").run(p.id, p.nom, p.description, p.etape, JSON.stringify(questions), "[]", null, demo ? 1 : 0, p.creeLe);
+      const p: Projet = { id: randomUUID().slice(0, 12), nom: "Nouveau projet", description, etape: "questions", questions, reponses: [], remarques: [], arbre: null, demo, creeLe: new Date().toISOString(), depot: null };
+      db.prepare("INSERT INTO projets (id, nom, description, etape, questions, reponses, arbre, demo, cree_le) VALUES (?,?,?,?,?,?,?,?,?)").run(p.id, p.nom, p.description, p.etape, JSON.stringify(questions), "[]", null, demo ? 1 : 0, p.creeLe);
       return p;
     },
     enregistrerArbre(id: string, reponses: string[], arbre: Arbre) {
@@ -67,6 +71,10 @@ export function ouvrirBase(fichier?: string) {
     enregistrerLecture(id: string, r: ResultatLecture) {
       db.prepare("UPDATE projets SET arbre=? WHERE id=?").run(JSON.stringify(r.arbre), id);
       db.prepare("UPDATE depots SET info=? WHERE projet_id=?").run(JSON.stringify(r.depot), id);
+    },
+    /** Enregistre l'arbre ajusté, avec les réponses et les remarques qui l'ont fait changer. */
+    enregistrerAjustement(id: string, reponses: string[], remarques: string[], arbre: Arbre) {
+      db.prepare("UPDATE projets SET nom=?, reponses=?, remarques=?, arbre=? WHERE id=?").run(arbre.produit.nom, JSON.stringify(reponses), JSON.stringify(remarques), JSON.stringify(arbre), id);
     },
     /** Enregistre l'arbre après une correction à la main, sans toucher au reste. */
     enregistrerCorrection(id: string, arbre: Arbre) {

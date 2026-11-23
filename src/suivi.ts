@@ -81,3 +81,36 @@ export function apresLecture(avant: Arbre, apres: Arbre, lectureDavant: string |
   }
   return lectureDavant ? { depuis: lectureDavant, lignes } : null;
 }
+
+/**
+ * Après un ajustement de l'arbre par l'IA : chaque case qui a gardé son titre retrouve tout ce que l'outil savait d'elle
+ * (état, preuves, fiche, correction à la main). Les cases trouvées dans le dépôt, que l'IA n'a pas vues, retrouvent leur famille.
+ */
+export function reprendre(ancien: Arbre, nouveau: Arbre, depotLu: boolean): Arbre {
+  const connues = new Map<string, Case>();
+  for (const c of cases(ancien)) { connues.set(cle(c.titre), c); connues.set(cle(titreOrigine(c)), c); }
+  for (const f of nouveau.familles) for (const t of f.themes) t.cases = t.cases.map((n) => {
+    const v = connues.get(cle(n.titre));
+    if (!v || v.origine === "depot") {
+      if (depotLu && n.etat === "todo") n.ouOnEnEst = "Pas encore vérifié dans le dépôt : mettez la carte à jour.";
+      return n;
+    }
+    const c: Case = { ...v, citation: n.citation, base: n.base };
+    if (!v.corrige) c.aQuoiCaSert = n.aQuoiCaSert;
+    // Une case sans preuve suit le nouvel horizon (« après cette version », « hors dépôt »…) ; une case prouvée garde son état.
+    if (v.base !== n.base && lu(v) === v.base) {
+      if (c.corrige) c.etatLu = n.etat; else c.etat = n.etat;
+      c.ouOnEnEst = n.ouOnEnEst;
+    }
+    return c;
+  });
+  for (const f of ancien.familles) for (const t of f.themes) for (const c of t.cases) {
+    if (c.origine !== "depot") continue;
+    const famille = nouveau.familles.find((x) => cle(x.titre) === cle(f.titre));
+    if (!famille) continue; // elle reviendra à la prochaine mise à jour
+    let theme = famille.themes.find((x) => cle(x.titre) === cle(t.titre));
+    if (!theme) { theme = { id: t.id, titre: t.titre, cases: [] }; famille.themes.push(theme); }
+    theme.cases.push(c);
+  }
+  return nouveau;
+}

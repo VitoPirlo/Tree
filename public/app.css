@@ -43,3 +43,7 @@ a.chip{text-decoration:none;color:var(--ink)}
 .fl.nv{font-style:normal}
 .fl.nv.ec{background:var(--drift)}
 .top>.hud:last-child{justify-content:flex-end}
+
+/* le prompt à donner à son IA pour qu'elle écrive la description */
+.aide summary{cursor:pointer;font-weight:600}
+.aide pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#f6f7f9;border:1px solid #dfe3ea;border-radius:10px;padding:12px;max-height:230px;overflow:auto;margin:10px 0}

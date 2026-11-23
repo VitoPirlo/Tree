@@ -123,3 +123,4 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .card .cor select,.card .cor input,.card .cor textarea{font:inherit;font-size:13.5px;padding:6px 8px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
 .card .cp.ghost{background:var(--bg);color:var(--ink);box-shadow:none;border:2px solid var(--line)}
 .row-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tg[hidden]{display:none}

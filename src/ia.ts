@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { z as zod } from "zod";
-import { ArbreIA, QuestionsIA, type Question } from "./arbre.ts";
+import { ArbreIA, QuestionsIA, type Arbre, type Question } from "./arbre.ts";
 import { ARBRE_DEMO, QUESTIONS_DEMO, planDemo, jugementDemo } from "./demo.ts";
 import type { ContexteJugement, ContextePlan, IALecture } from "./lecture.ts";
 
@@ -39,13 +39,23 @@ export interface IA extends IALecture {
   modeDemo: boolean;
   poserQuestions(description: string): Promise<QuestionsIA>;
   genererArbre(description: string, reponses: { question: Question; reponse: string }[]): Promise<ArbreIA>;
+  /** Reprend un arbre existant pour tenir compte de nouvelles réponses ou d'une remarque libre. */
+  ajusterArbre(c: ContexteAjustement): Promise<ArbreIA>;
+}
+export interface ContexteAjustement {
+  description: string; arbre: Arbre;
+  /** Les réponses qui viennent d'être validées. */
+  nouvelles: { question: Question; reponse: string }[];
+  /** Ce dont l'arbre tient déjà compte : à ne pas défaire. */
+  dejaPris: string[];
+  remarque: string;
 }
 
 const REGLES_COMMUNES = `Tu aides un fondateur ou un dirigeant qui ne lit pas le code à comprendre et piloter le logiciel qu'il fait construire. Il te donne la description de son projet, en texte libre. Tu écris en français, sans aucun jargon technique, et quand tu t'adresses à lui tu le vouvoies.`;
 
 const SYSTEME_QUESTIONS = `${REGLES_COMMUNES}
 
-À partir de sa description, tu vas plus tard dessiner un arbre du produit : produit, familles, thèmes, cases. Avant cela, pose-lui les questions dont la réponse changerait cet arbre, et seulement celles-là. Entre 3 et 5 questions, moins si la description répond déjà à tout.
+À partir de sa description, un premier arbre du produit est dessiné : produit, familles, thèmes, cases. Il le voit tout de suite, et tes questions s'affichent à côté pour l'affiner. Pose-lui les questions dont la réponse changerait cet arbre, et seulement celles-là. Entre 3 et 5 questions, moins si la description répond déjà à tout.
 
 Les sujets qui changent l'arbre : le périmètre de cette version, les priorités, ce qui est explicitement hors périmètre, et qui porte quelle partie du produit (un associé, un prestataire, des agents IA). Si la description ne dit pas qui fait quoi, demande-le : l'arbre affiche un responsable par famille.
 
@@ -69,6 +79,14 @@ Pour chaque case :
 Pour chaque famille : une description d'une ou deux phrases sur son enjeu, l'emblème le plus parlant dans la liste proposée, et « responsable », le prénom ou le nom de la personne ou de l'équipe qui la porte si la description ou les réponses le disent. Sinon laisse « responsable » vide : ne devine pas.
 
 Pour le produit : son nom tel que l'utilisateur l'appelle, et un résumé de deux phrases au plus, sur ce qu'il fait et pour qui.`;
+
+const SYSTEME_AJUSTEMENT = `${SYSTEME_ARBRE}
+
+Cette fois, un arbre existe déjà et il l'a sous les yeux. Il vient de répondre à des questions, ou d'écrire avec ses mots ce qui ne va pas. Rends l'arbre complet, corrigé.
+
+Change tout ce que ses réponses et sa remarque demandent, et rien d'autre : il doit reconnaître son arbre. Une case, un thème ou une famille qui ne sont pas concernés gardent leur titre mot pour mot, à la lettre près, ainsi que leur place : l'outil s'en sert pour retrouver ce qu'il sait déjà de chaque case. Ne défais pas ce qui a déjà été pris en compte.
+
+Sa remarque passe avant le reste : s'il dit qu'une partie manque, ajoute-la ; qu'une case est de trop, retire-la ; qu'un découpage est mauvais, refais-le. Une case née de sa remarque ou d'une réponse n'a pas de citation, sauf si une phrase de la description convient mot pour mot.`;
 
 const SYSTEME_PLAN = `${REGLES_COMMUNES}
 
@@ -187,6 +205,15 @@ class IAAnthropic implements IA {
       `<description>\n${c.commun.description}\n</description>\n\n<documentation>\n${blocFichiers(c.commun.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.commun.chemins.join("\n")}\n</fichiers_du_depot>`);
   }
 
+  ajusterArbre(c: ContexteAjustement) {
+    const arbre = c.arbre.familles.map((f) =>
+      `Famille : ${f.titre} | responsable : ${f.responsable ?? "non précisé"} | emblème : ${f.embleme}\n  ${f.description}\n` +
+      f.themes.map((t) => `  Thème : ${t.titre}\n` + t.cases.map((x) => `    - ${x.titre} [${x.base === "later" ? "apres" : x.base === "out" ? "hors_depot" : "version"}] : ${x.aQuoiCaSert}${x.citation ? ` (citation : ${x.citation})` : ""}`).join("\n")).join("\n")).join("\n\n");
+    const nouvelles = c.nouvelles.map((r, i) => `Question ${i + 1} : ${r.question.question}\nRéponse : ${r.reponse.trim()}`).join("\n\n");
+    return this.appel(ArbreIA, SYSTEME_AJUSTEMENT,
+      `<description>\n${c.description}\n</description>\n\n<arbre_actuel>\nProduit : ${c.arbre.produit.nom}. ${c.arbre.produit.resume}\n\n${arbre}\n</arbre_actuel>\n\n<deja_pris_en_compte>\n${c.dejaPris.join("\n") || "(rien)"}\n</deja_pris_en_compte>\n\n<nouvelles_reponses>\n${nouvelles || "(aucune)"}\n</nouvelles_reponses>\n\n<remarque>\n${c.remarque.trim() || "(aucune)"}\n</remarque>`, "high");
+  }
+
   genererArbre(description: string, reponses: { question: Question; reponse: string }[]) {
     const qr = reponses
       .map((r, i) => `Question ${i + 1} : ${r.question.question}\nRéponse : ${r.reponse.trim() || "(sans réponse : ne suppose rien)"}`)
@@ -200,6 +227,7 @@ class IADemo implements IA {
   modeDemo = true;
   async poserQuestions() { return QUESTIONS_DEMO; }
   async genererArbre() { return ARBRE_DEMO; }
+  async ajusterArbre() { return ARBRE_DEMO; }
   async planifier(c: ContextePlan) { return planDemo(c); }
   async juger(c: ContexteJugement) { return jugementDemo(c); }
 }

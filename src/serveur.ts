@@ -11,7 +11,7 @@ import { creerIA, ErreurIA, type IA } from "./ia.ts";
 import { DEPOT_DEMO, DESCRIPTION_DEMO } from "./demo.ts";
 import { DepotGitHub, ErreurDepot, lireNomDepot, type Depot } from "./github.ts";
 import { lireDepot } from "./lecture.ts";
-import { annulerCorrection, apresLecture, avantLecture, corrigerCase } from "./suivi.ts";
+import { annulerCorrection, apresLecture, avantLecture, corrigerCase, reprendre } from "./suivi.ts";
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
@@ -44,13 +44,13 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
   // Lectures de dépôt en cours. Elles durent plusieurs minutes : le navigateur vient demander où on en est.
   const lectures = new Map<string, Lecture>();
   /** Ce que le navigateur reçoit d'un projet : ni la description, ni le jeton GitHub. */
-  const vue = (p: Projet) => ({ id: p.id, nom: p.nom, etape: p.etape, questions: p.questions, arbre: p.arbre, demo: p.demo, creeLe: p.creeLe, depot: p.depot, lecture: lectures.get(p.id) ?? null });
+  const vue = (p: Projet) => ({ id: p.id, nom: p.nom, etape: p.etape, questions: p.questions, reponses: p.reponses, remarques: p.remarques, arbre: p.arbre, demo: p.demo, creeLe: p.creeLe, depot: p.depot, lecture: lectures.get(p.id) ?? null });
 
   function lancerLecture(projet: Projet, depot: Depot) {
     if (lectures.get(projet.id)?.enCours || !projet.arbre) return;
     const suivi: Lecture = { enCours: true, message: "Connexion au dépôt…", erreur: null };
     lectures.set(projet.id, suivi);
-    const precisions = projet.questions.map((q, i) => (projet.reponses[i]?.trim() ? `${q.question} ${projet.reponses[i].trim()}` : "")).filter(Boolean).join("\n");
+    const precisions = [...projet.questions.map((q, i) => (projet.reponses[i]?.trim() ? `${q.question} ${projet.reponses[i].trim()}` : "")), ...projet.remarques].filter(Boolean).join("\n");
     // Une copie de l'arbre d'avant, pour remettre les corrections à la main et dire ce qui a changé.
     const avant = avantLecture(projet.arbre), lectureDavant = projet.depot?.luLe;
     lireDepot({ description: projet.description, precisions, arbre: projet.arbre }, depot, ia, base.cache, (m) => { suivi.message = m; })
@@ -90,10 +90,14 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       const description = String((await corps(req)).description ?? "").trim();
       if (description.length < 80) throw new ErreurHttp(400, "La description est trop courte pour en tirer un arbre. Ajoutez quelques phrases sur ce que le produit doit faire.");
       if (description.length > MAX_DESCRIPTION) throw new ErreurHttp(400, "La description est trop longue (60 000 caractères au plus).");
-      const questions = normaliserQuestions(await ia.poserQuestions(description));
-      return vue(base.creer(description, questions, ia.modeDemo));
+      // Le premier arbre se dessine tout de suite, à partir de la description seule. Les questions servent ensuite à l'affiner.
+      const [questions, brut] = await Promise.all([ia.poserQuestions(description), ia.genererArbre(description, [])]);
+      const arbre = normaliserArbre(brut, description);
+      const projet = base.creer(description, normaliserQuestions(questions), ia.modeDemo);
+      base.enregistrerArbre(projet.id, [], arbre);
+      return vue(base.trouver(projet.id)!);
     }
-    const un = /^\/api\/projets\/([\w-]+)(\/reponses|\/depot|\/lecture|\/cases\/[\w-]+)?$/.exec(chemin);
+    const un = /^\/api\/projets\/([\w-]+)(\/reponses|\/ajuster|\/depot|\/lecture|\/cases\/[\w-]+)?$/.exec(chemin);
     if (un) {
       const projet = base.trouver(un[1]);
       if (!projet) throw new ErreurHttp(404, "Projet introuvable.");
@@ -125,6 +129,22 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
         const recu = await corps(req);
         if (recu.annuler) annulerCorrection(laCase); else corrigerCase(laCase, recu);
         base.enregistrerCorrection(projet.id, projet.arbre);
+        return vue(base.trouver(projet.id)!);
+      }
+      if (un[2] === "/ajuster" && m === "POST") {
+        if (!projet.arbre) throw new ErreurHttp(400, "Générez d'abord l'arbre.");
+        if (lectures.get(projet.id)?.enCours) throw new ErreurHttp(409, "Une lecture du dépôt est en cours. Ajustez l'arbre quand elle sera terminée.");
+        const recu = await corps(req);
+        const remarque = String(recu.remarque ?? "").trim().slice(0, 4000);
+        const saisies = projet.questions.map((_, i) => String(Array.isArray(recu.reponses) ? recu.reponses[i] ?? "" : "").trim().slice(0, 2000));
+        const nouvelles = projet.questions.map((question, i) => ({ question, reponse: saisies[i] })).filter((r) => r.reponse);
+        if (!nouvelles.length && !remarque) throw new ErreurHttp(400, "Répondez à une question ou dites ce qui ne va pas dans l'arbre.");
+        const dejaPris = [...projet.questions.map((q, i) => (!saisies[i] && projet.reponses[i]?.trim() ? `${q.question} ${projet.reponses[i].trim()}` : "")), ...projet.remarques].filter(Boolean);
+        const sansDepot = structuredClone(projet.arbre);
+        for (const f of sansDepot.familles) { for (const t of f.themes) t.cases = t.cases.filter((c) => c.origine !== "depot"); f.themes = f.themes.filter((t) => t.cases.length); }
+        const brut = await ia.ajusterArbre({ description: projet.description, arbre: sansDepot, nouvelles, dejaPris, remarque });
+        const arbre = reprendre(projet.arbre, normaliserArbre(brut, projet.description), !!projet.depot?.sha);
+        base.enregistrerAjustement(projet.id, projet.questions.map((_, i) => saisies[i] || projet.reponses[i] || ""), remarque ? [...projet.remarques, remarque] : projet.remarques, arbre);
         return vue(base.trouver(projet.id)!);
       }
       if (un[2] === "/reponses" && m === "POST") {

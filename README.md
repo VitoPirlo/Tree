@@ -8,6 +8,7 @@ on décrit son projet, l'outil en tire un arbre, puis le remplit à partir du d�
 - Étape 1 (faite) : description → questions → arbre vide, affiché comme le prototype.
 - Étape 2 (faite) : connexion GitHub en lecture seule, états et preuves.
 - Étape 3 (faite) : fiches complètes, écarts, prompts.
+- Parcours d'entrée : un prompt à donner à l'IA du projet pour qu'elle décrive le produit, un premier arbre tout de suite, puis des questions et une zone de remarques à côté pour l'ajuster.
 - Étape 4 (faite) : bouton « Mettre à jour », résumé de ce qui a changé, corrections à la main conservées.
 
 ## Lancer l'outil

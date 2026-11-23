@@ -7,13 +7,14 @@ import { ARBRE_DEMO, DEPOT_DEMO, DESCRIPTION_DEMO, jugementDemo, planDemo, QUEST
 import type { IA } from "../src/ia.ts";
 import { lireDepot, type Cache } from "../src/lecture.ts";
 import { creerServeur } from "../src/serveur.ts";
-import { annulerCorrection, apresLecture, avantLecture, corrigerCase } from "../src/suivi.ts";
+import { annulerCorrection, apresLecture, avantLecture, corrigerCase, reprendre } from "../src/suivi.ts";
 
 const cacheMemoire = (): Cache => { const m = new Map<string, string>(); return { lire: (c) => m.get(c) ?? null, ecrire: (c, v) => void m.set(c, v) }; };
 const iaDemo: IA = {
   modeDemo: true,
   async poserQuestions() { return QUESTIONS_DEMO; },
   async genererArbre() { return ARBRE_DEMO; },
+  async ajusterArbre() { return ARBRE_DEMO; },
   async planifier(c) { return planDemo(c); },
   async juger(c) { return jugementDemo(c); },
 };
@@ -108,6 +109,20 @@ test("quand le dépôt contredit une correction, le résumé le dit et la correc
   assert.equal(trouver(avant, "Payer sur place").etat, "later");
 });
 
+test("ajustement : une case nouvelle part de zéro, une case repoussée change d'horizon, une case prouvée garde son état", async () => {
+  const { arbre: ancien } = await lire(normaliserArbre(ARBRE_DEMO, DESCRIPTION_DEMO), null);
+  const brut = structuredClone(ARBRE_DEMO);
+  const theme = brut.familles[0].themes[0];
+  theme.cases.push({ titre: "Choisir son réparateur", aQuoiCaSert: "Le client retrouve la personne qu'il connaît.", horizon: "version", citation: "" });
+  for (const f of brut.familles) for (const t of f.themes) for (const c of t.cases) if (c.titre === "Payer sur place" || c.titre === "Réserver sans créer de compte") c.horizon = "apres";
+  const nouveau = reprendre(ancien, normaliserArbre(brut, DESCRIPTION_DEMO), true);
+  const neuve = trouver(nouveau, "Choisir son réparateur");
+  assert.equal(neuve.etat, "todo"); assert.match(neuve.ouOnEnEst, /mettez la carte à jour/);
+  assert.equal(trouver(nouveau, "Payer sur place").etat, "later");
+  const prouvee = trouver(nouveau, "Réserver sans créer de compte");
+  assert.equal(prouvee.etat, "done", "le dépôt la prouve : elle reste débloquée"); assert.equal(prouvee.base, "later");
+});
+
 test("serveur : sans le mot de passe on ne lit rien, et le parcours mise à jour + correction tient", async () => {
   const serveur = creerServeur(ouvrirBase(":memory:"), iaDemo, "secret");
   await new Promise<void>((pret) => serveur.listen(0, "127.0.0.1", pret));
@@ -124,8 +139,11 @@ test("serveur : sans le mot de passe on ne lit rien, et le parcours mise à jour
     cookie = (await appel("/connexion", { motDePasse: "secret" })).cookie.split(";")[0];
     assert.equal((await appel("/projets")).code, 200);
 
-    const id = (await appel("/projets", { description: DESCRIPTION_DEMO })).d.id;
-    await appel(`/projets/${id}/reponses`, { reponses: [] });
+    const cree = (await appel("/projets", { description: DESCRIPTION_DEMO })).d;
+    assert.equal(cree.etape, "arbre", "le premier arbre est là dès la création, sans attendre les réponses");
+    assert.ok(cree.questions.length > 0 && cree.arbre.familles.length > 0);
+    const id = cree.id;
+    assert.equal((await appel(`/projets/${id}/ajuster`, { reponses: [], remarque: "  " })).code, 400);
     const attendre = async () => { for (;;) { const p = (await appel(`/projets/${id}`)).d; if (!p.lecture?.enCours) return p; await new Promise((r) => setTimeout(r, 10)); } };
     await appel(`/projets/${id}/depot`, {});
     let p = await attendre();
@@ -139,6 +157,14 @@ test("serveur : sans le mot de passe on ne lit rien, et le parcours mise à jour
     p = await attendre();
     assert.deepEqual(p.depot.changements.lignes, []);
     assert.equal(trouver(p.arbre, "Payer en ligne").etat, "done", "la correction a survécu à la mise à jour");
+    // Ajuster l'arbre ne fait rien perdre : états, preuves, correction et cases trouvées dans le dépôt sont repris.
+    const duDepot = cases(p.arbre).filter((c: Case) => c.origine === "depot").length;
+    p = (await appel(`/projets/${id}/ajuster`, { reponses: ["Camille"], remarque: "Il manque la caisse." })).d;
+    assert.equal(p.reponses[0], "Camille"); assert.deepEqual(p.remarques, ["Il manque la caisse."]);
+    const reprise = trouver(p.arbre, "Payer en ligne");
+    assert.equal(reprise.id, laCase.id); assert.equal(reprise.etat, "done"); assert.equal(reprise.etatLu, "wip"); assert.ok(reprise.preuves.length > 0);
+    assert.equal(trouver(p.arbre, "Réserver sans créer de compte").etat, "done");
+    assert.equal(cases(p.arbre).filter((c: Case) => c.origine === "depot").length, duDepot);
     p = (await appel(`/projets/${id}/cases/${laCase.id}`, { annuler: true })).d;
     assert.equal(trouver(p.arbre, "Payer en ligne").etat, "wip");
   } finally { serveur.close(); serveur.closeAllConnections(); }

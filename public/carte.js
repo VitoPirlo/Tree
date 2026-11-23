@@ -58,7 +58,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         <div class="chip k"><i class="lg t"></i><b id="c3"></b> à débloquer</div>
         ${projet.demo ? '<div class="chip demo">Exemple de démonstration</div>' : ""}
       </div>
-      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="maj" hidden>Mettre à jour</button><button class="tg depot" id="gh"></button></div>
+      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="aff"></button><button class="tg depot" id="maj" hidden>Mettre à jour</button><button class="tg depot" id="gh"></button></div>
     </div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
@@ -130,6 +130,16 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       h += `<span class="ey">Ce qui existe ne correspond pas à ce que vous avez écrit</span><h2>Écarts avec la description</h2><ul>`;
       F.forEach((f, fi) => f.themes.forEach((t, gi) => t.cases.forEach((n, ni) => { if (n.ecart) h += `<li><button data-go="s${fi}-${gi}-${ni}"><span>${esc(f.titre)} · <b>${esc(n.titre)}</b><br><span class="ev">${esc(n.ecart.constat)}</span></span></button></li>`; })));
       h += "</ul>";
+    } else if (sel === "affiner") {
+      const qs = projet.questions ?? [], rs = projet.reponses ?? [];
+      const ouvertes = qs.map((q, i) => ({ ...q, i })).filter((q) => !rs[q.i]?.trim()), prises = qs.map((q, i) => ({ ...q, i })).filter((q) => rs[q.i]?.trim());
+      h += `<span class="ey">Votre arbre, à votre main</span><h2>Ajuster l'arbre</h2>
+        <p>Ce premier arbre vient de votre description seule. Répondez à ce que vous voulez, dans l'ordre que vous voulez : l'arbre se redessine en gardant tout ce qui ne change pas.</p>
+        <div class="cor">
+        ${ouvertes.map((q) => `<label>${esc(q.question)}<small class="ev">${esc(q.pourquoi)}</small><textarea rows="2" data-q="${q.i}" maxlength="2000"></textarea></label>`).join("")}
+        <label>${ouvertes.length ? "Autre chose ne va pas dans l'arbre ?" : "Quelque chose ne va pas dans l'arbre ?"}<small class="ev">Dites-le avec vos mots : une partie qui manque, une case de trop, un découpage qui ne vous parle pas.</small><textarea rows="4" id="aff-rem" maxlength="4000"></textarea></label>
+        <div id="aff-msg"></div><div class="row-tags"><button class="cp" id="aff-ok">Ajuster l'arbre</button></div></div>
+        ${prises.length || projet.remarques?.length ? `<details class="ev"><summary>Déjà pris en compte (${prises.length + (projet.remarques?.length ?? 0)})</summary><ul style="margin-top:6px">${prises.map((q) => `<li><span><b>${esc(q.question)}</b><br>${esc(rs[q.i])}</span></li>`).join("")}${(projet.remarques ?? []).map((r) => `<li><span><b>Votre remarque</b><br>${esc(r)}</span></li>`).join("")}</ul></details>` : ""}`;
     } else if (sel === "depot") {
       const l = projet.lecture, d = projet.depot;
       h += `<span class="ey">Dépôt GitHub · lecture seule</span>`;
@@ -209,6 +219,17 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         suivre(); render();
       } catch (e) { go.disabled = false; el.querySelector("#gh-msg").innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
     };
+    const aff = el.querySelector("#aff-ok");
+    if (aff) aff.onclick = async () => {
+      const reponses = (projet.questions ?? []).map((_, i) => el.querySelector(`[data-q="${i}"]`)?.value ?? "");
+      const msg = el.querySelector("#aff-msg");
+      aff.disabled = true; msg.innerHTML = '<p class="wait">L\'arbre s\'ajuste… Cela prend environ une minute.</p>';
+      try {
+        projet = await api(`/projets/${projet.id}/ajuster`, { reponses, remarque: el.querySelector("#aff-rem").value });
+        arbre = projet.arbre; F = arbre.familles; render();
+        el.querySelector("#aff-msg").innerHTML = `<p class="ev">Arbre ajusté.${projet.depot?.sha ? " Pour vérifier les nouvelles cases dans le dépôt, cliquez sur « Mettre à jour »." : ""}</p>`;
+      } catch (e) { aff.disabled = false; msg.innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
+    };
     const maj = el.querySelector("#gh-maj");
     if (maj) maj.onclick = mettreAJour;
     const corriger = (bouton, corps) => async () => {
@@ -259,12 +280,16 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     b.innerHTML = l?.enCours ? `<i class="lg w"></i><span>${esc(l.message)}</span>` : projet.depot?.sha ? `<span>Dépôt ${esc(projet.depot.nom)}</span>` : `<span>Connecter GitHub</span>`;
     b.setAttribute("aria-pressed", sel === "depot");
     $("#maj").hidden = !projet.depot?.sha || !!l?.enCours;
+    const reste = (projet.questions ?? []).filter((_, i) => !projet.reponses?.[i]?.trim()).length;
+    $("#aff").innerHTML = `<span>Ajuster l'arbre</span>${reste ? `<i>${reste}</i>` : ""}`;
+    $("#aff").hidden = !!l?.enCours; $("#aff").setAttribute("aria-pressed", sel === "affiner");
   }
   async function mettreAJour() {
     try { projet = await api(`/projets/${projet.id}/lecture`, {}); } catch (e) { projet.lecture = { enCours: false, message: "", erreur: e.message }; }
     ecartsOn = false; sel = "depot"; suivre(); render();
   }
   $("#maj").onclick = mettreAJour;
+  $("#aff").onclick = () => { ecartsOn = false; sel = sel === "affiner" ? null : "affiner"; render(); };
   $("#gh").onclick = () => { ecartsOn = false; sel = sel === "depot" ? null : "depot"; render(); };
   $("#dt").onclick = () => { ecartsOn = !ecartsOn; sel = ecartsOn ? "ecarts" : null; render(); };
   let minuterie = 0;
@@ -284,6 +309,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     }, 1500);
   }
   function render() { build(); card(); bouton(); }
+  // À l'arrivée sur un arbre tout neuf, les questions sont ouvertes à côté.
+  if (!projet.depot && (projet.questions ?? []).some((_, i) => !projet.reponses?.[i]?.trim())) sel = "affiner";
   suivre();
   render(); fit(false);
 }
