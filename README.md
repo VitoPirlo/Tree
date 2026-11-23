@@ -27,17 +27,18 @@ Réglages, lus dans l'environnement et jamais écrits dans le code :
 
 ## Mettre en ligne
 
-Le dépôt contient de quoi mettre l'outil en ligne sur Render (render.com), sans rien installer :
+Le dépôt contient de quoi mettre l'outil en ligne sur Railway (railway.com), sans rien installer. Les noms des menus peuvent varier un peu :
 
-1. Sur Render : « New », « Blueprint », puis choisir ce dépôt. Render lit `render.yaml`.
-2. Render demande deux valeurs : `APP_PASSWORD` (le mot de passe que vous choisissez pour entrer dans l'outil) et `CARTE_ANTHROPIC_API_KEY` (la clé de l'IA).
-3. Valider. Quelques minutes plus tard, l'outil est à l'adresse que Render affiche, en https.
+1. Sur Railway : « New Project », « Deploy from GitHub repo », puis choisir ce dépôt. Railway lit `railway.toml` et le `Dockerfile`.
+2. Dans l'onglet « Variables » du service, ajouter `APP_PASSWORD` (le mot de passe que vous choisissez pour entrer dans l'outil) et `CARTE_ANTHROPIC_API_KEY` (la clé de l'IA).
+3. Ajouter un volume au service (clic droit sur le service, « Attach volume ») avec le chemin `/data`. C'est là que sont rangés les projets : sans volume, ils seraient perdus à chaque redémarrage.
+4. Dans « Settings », « Networking », cliquer sur « Generate Domain » : c'est l'adresse de l'outil, en https.
 
-Ce que cela met en place : un service payant (offre « starter », avec un disque de 1 Go où sont rangés les projets). Sans disque, les projets seraient perdus à chaque redémarrage.
+Tant que `APP_PASSWORD` n'est pas réglé, l'outil refuse de répondre depuis l'extérieur et Railway affiche que le démarrage a échoué : c'est voulu. Réglez le mot de passe, Railway relance tout seul.
 
-Ailleurs que sur Render, le `Dockerfile` suffit : il faut donner les deux mêmes valeurs, et brancher un disque qui persiste sur `/data`.
+Ailleurs que sur Railway, le `Dockerfile` suffit : il faut donner les deux mêmes valeurs, et brancher un disque qui persiste sur `/data`.
 
-À savoir avant d'ouvrir l'outil à quelqu'un d'autre : il n'y a qu'un seul mot de passe, partagé ; après dix essais faux, il faut attendre un quart d'heure. Les jetons GitHub que vous collez dans l'outil sont rangés sur ce disque : donnez toujours un jeton en lecture seule.
+À savoir avant d'ouvrir l'outil à quelqu'un d'autre : il n'y a qu'un seul mot de passe, partagé ; après dix essais faux, il faut attendre un quart d'heure. Les jetons GitHub que vous collez dans l'outil sont rangés sur ce volume : donnez toujours un jeton en lecture seule.
 
 ## Vérifier
 

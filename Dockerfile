@@ -1,5 +1,5 @@
 # Image pour mettre Carte produit en ligne. Les réglages (mot de passe, clé de l'IA) se donnent
-# à l'hébergeur, jamais ici. Le dossier /data doit être un disque qui persiste : il contient les projets.
+# à l'hébergeur, jamais ici. Le dossier /data doit être un disque qui persiste (un « volume » chez Railway) : il contient les projets.
 FROM node:22-slim
 WORKDIR /app
 COPY package.json package-lock.json ./

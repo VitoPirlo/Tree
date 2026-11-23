@@ -1,0 +1,10 @@
+# Mise en ligne sur Railway (railway.com). Railway lit ce fichier tout seul.
+# Le mot de passe et la clé de l'IA se donnent dans l'onglet « Variables » de Railway, jamais ici.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/etat"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
