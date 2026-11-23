@@ -1,7 +1,7 @@
 // Le cœur de la confiance : c'est ce fichier, et pas l'IA, qui décide de l'état d'une case.
 // L'IA propose un avis et des preuves ; ici chaque preuve est contrôlée contre le dépôt réel.
 // Une preuve qui ne se vérifie pas est écartée, et sans preuve la case ne change pas d'état.
-import type { Etat } from "./arbre.ts";
+import { citationVerifiee, type Ecart, type Etat } from "./arbre.ts";
 
 export type Avis = "fait" | "en_cours" | "pas_fait" | "incertain";
 
@@ -91,4 +91,39 @@ export function decider(base: Etat, avis: Avis, proposees: PreuveIA[], faits: Fa
   if ((avis === "fait" || avis === "en_cours") && (surPrincipale || enChantier)) return { etat: "wip", nonVerifie: false, teste, preuves, ecartees };
   if (avis === "pas_fait") return { etat: base, nonVerifie: false, teste: false, preuves: [], ecartees };
   return { etat: base, nonVerifie: true, teste: false, preuves: [], ecartees };
+}
+
+/** Un écart tel que l'IA le propose : une phrase de la description, et le fait constaté dans le dépôt avec sa preuve. */
+export interface EcartIA { citation: string; constat: string; chemin: string; extrait: string; numero: number }
+
+/**
+ * Un écart n'est affiché que s'il tient des deux côtés : la phrase citée figure mot pour mot dans la description,
+ * et le fait constaté s'appuie sur une preuve vérifiée (la sienne, ou celles de la case).
+ */
+export function verifierEcart(e: EcartIA, description: string, faits: Faits, preuvesDeLaCase: Preuve[]): Ecart | null {
+  const constat = e.constat.replace(/\s+/g, " ").trim();
+  const citation = citationVerifiee(e.citation, description);
+  if (!constat || !citation) return null;
+  const propre = e.chemin.trim()
+    ? verifierPreuve({ type: "fichier", chemin: e.chemin, extrait: e.extrait, numero: 0 }, faits)
+    : e.numero ? verifierPreuve({ type: "fusion", chemin: "", extrait: "", numero: e.numero }, faits) : null;
+  return propre || preuvesDeLaCase.length ? { citation, constat } : null;
+}
+
+export interface PromptIA { objectif: string; ouIntervenir: string; aReutiliser: string; reussiQuand: string; attention: string }
+
+/** Assemble le prompt à copier. Les règles de travail viennent des fichiers du dépôt, jamais inventées : sans eux, la rubrique est absente. */
+export function assemblerPrompt(p: PromptIA, depot: { nom: string; presentation: string; regles: string; docs: string[] }): string | null {
+  const t = (s: string) => s.replace(/\s+/g, " ").trim();
+  if (!t(p.objectif) || !t(p.reussiQuand)) return null;
+  const lignes = [
+    `Tu travailles dans le dépôt ${depot.nom}${t(depot.presentation) ? ` (${t(depot.presentation).replace(/\.$/, "")})` : ""}.${depot.docs.length ? ` Commence par lire ${depot.docs.join(", ")}.` : ""}`,
+    `Objectif : ${t(p.objectif)}`,
+    t(p.ouIntervenir) && `Où intervenir : ${t(p.ouIntervenir)}`,
+    t(p.aReutiliser) && `À réutiliser, sans le reconstruire : ${t(p.aReutiliser)}`,
+    `C'est réussi quand : ${t(p.reussiQuand)}`,
+    t(depot.regles) && `Règles du dépôt : ${t(depot.regles)}`,
+    t(p.attention) && `Attention : ${t(p.attention)}`,
+  ];
+  return lignes.filter(Boolean).join("\n\n");
 }

@@ -58,7 +58,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         <div class="chip k"><i class="lg t"></i><b id="c3"></b> à débloquer</div>
         ${projet.demo ? '<div class="chip demo">Exemple de démonstration</div>' : ""}
       </div>
-      <button class="tg depot" id="gh"></button>
+      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="gh"></button></div>
     </div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
@@ -67,7 +67,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     <aside class="card" id="card" hidden aria-live="polite"></aside>`;
   const $ = (s) => racine.querySelector(s);
   const board = $("#board"), layer = $("#layer");
-  let W = 0, H = 0, sel = null;
+  let W = 0, H = 0, sel = null, ecartsOn = false;
 
   function build() {
     let html = "", lines = "";
@@ -80,15 +80,15 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     F.forEach((f, fi) => {
       const c = stat(toutes(f)), fy = y, fcy = fy + FH / 2, [fc, ft] = COULEURS[fi % COULEURS.length], sty = `--fc:${fc};--ft:${ft}`;
       lines += `<g style="${sty}">` + (fi === 0 ? `<path class="ln" d="M${TRUNK} ${fcy} H${FX}"/>` : `<path class="ln" d="M${TRUNK} ${fcy - 12} Q${TRUNK} ${fcy} ${TRUNK + 12} ${fcy} H${FX}"/>`);
-      html += `<button class="nd fam" data-k="f${fi}" aria-pressed="${sel === "f" + fi}" style="${sty};left:${FX}px;top:${fy}px;width:${FW}px;height:${FH}px">
-        <span class="hex">${svg(EMBLEMES[f.embleme] ?? EMBLEMES.reglages)}</span><span class="tx"><b>${esc(f.titre)}</b><span class="xp"><span class="seg"><u style="width:${part(c.done, c.tot)}%"></u><u style="width:${part(c.wip, c.tot)}%"></u></span><i>${c.done}/${c.tot}</i></span></span></button>`;
+      html += `<button class="nd fam${ecartsOn && !c.ecarts ? " dim" : ""}" data-k="f${fi}" aria-pressed="${sel === "f" + fi}" style="${sty};left:${FX}px;top:${fy}px;width:${FW}px;height:${FH}px">
+        <span class="hex">${svg(EMBLEMES[f.embleme] ?? EMBLEMES.reglages)}</span><span class="tx"><b>${esc(f.titre)}</b><span class="xp"><span class="seg"><u style="width:${part(c.done, c.tot)}%"></u><u style="width:${part(c.wip, c.tot)}%"></u></span><i>${c.done}/${c.tot}</i></span></span>${c.ecarts ? `<span class="fl">${c.ecarts}</span>` : ""}</button>`;
       let gy = fy + (FH - SH) / 2, lastG = fcy;
       f.themes.forEach((t, gi) => {
         const steps = t.cases.map((n, i) => ({ ...n, i })).sort((a, z) => ORDER[a.etat] - ORDER[z.etat]);
         const gcy = gy + SH / 2, gs = stat(t.cases), gcl = gs.done ? "done" : "";
         lines += gi === 0 ? `<path class="ln ${gcl}" d="M${FX + FW} ${fcy} H${GX}"/>` : `<path class="ln ${gcl}" d="M${BUS} ${gcy - 12} Q${BUS} ${gcy} ${BUS + 12} ${gcy} H${GX}"/>`;
         lastG = gcy;
-        html += `<span class="gp" style="${sty};left:${GX}px;top:${gcy - GH / 2}px;width:${GW}px;height:${GH}px">${esc(t.titre)}</span>`;
+        html += `<span class="gp${ecartsOn && !gs.ecarts ? " dim" : ""}" style="${sty};left:${GX}px;top:${gcy - GH / 2}px;width:${GW}px;height:${GH}px">${esc(t.titre)}</span>`;
         steps.forEach((n, k) => {
           const r = Math.floor(k / PER), col = k % PER, x = STX + col * SX, sy = gy + r * ROWH, cy = sy + SH / 2;
           if (col === 0) {
@@ -96,7 +96,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
             else { const ex = GX + GW + 14; lines += `<path class="ln ${n.etat}" d="M${ex} ${gcy} V${cy - 12} Q${ex} ${cy} ${ex + 12} ${cy} H${x}"/>`; }
           } else lines += `<path class="ln ${n.etat}" d="M${x - (SX - SW)} ${cy} H${x}"/>`;
           const key = `s${fi}-${gi}-${n.i}`;
-          html += `<button class="nd st ${n.etat}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span>${n.nonVerifie ? '<i class="fl nv" title="Non vérifié">?</i>' : ""}</button>`;
+          html += `<button class="nd st ${n.etat}${ecartsOn && !n.ecart ? " dim" : ""}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span>${n.ecart ? '<i class="fl nv ec" title="Écart avec la description">!</i>' : n.nonVerifie ? '<i class="fl nv" title="Non vérifié">?</i>' : ""}</button>`;
         });
         gy += Math.ceil(steps.length / PER) * ROWH + 6;
       });
@@ -108,6 +108,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     W = STX + PER * SX + 4; H = y;
     layer.style.width = W + "px"; layer.style.height = H + "px";
     layer.innerHTML = `<svg class="wires" width="${W}" height="${H}" aria-hidden="true">${lines}</svg>` + html;
+    $("#dt").hidden = !g.ecarts; $("#dtl").textContent = `${g.ecarts} écart${g.ecarts > 1 ? "s" : ""} avec la description`;
+    $("#dt").setAttribute("aria-pressed", ecartsOn);
     $("#c1").textContent = g.done; $("#c2").textContent = g.wip; $("#c3").textContent = g.todo;
   }
 
@@ -124,6 +126,10 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         ${projet.depot?.sha
           ? `<p class="ev">Carte établie à partir de votre description et du dépôt ${esc(projet.depot.nom)} (branche ${esc(projet.depot.brancheDefaut)} au ${dateFr(projet.depot.dateDernierCommit)}), lu le ${dateFr(projet.depot.luLe)}. « Débloqué » veut dire construit et testé, pas encore éprouvé en production. Les cases à débloquer sont des propositions de l'outil, déduites de votre description.</p>${projet.depot.fichiersIgnores ? `<p class="ev">Dépôt très volumineux : ${projet.depot.fichiersIgnores} fichiers n'ont pas été pris en compte.</p>` : ""}`
           : `<p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}`;
+    } else if (sel === "ecarts") {
+      h += `<span class="ey">Ce qui existe ne correspond pas à ce que vous avez écrit</span><h2>Écarts avec la description</h2><ul>`;
+      F.forEach((f, fi) => f.themes.forEach((t, gi) => t.cases.forEach((n, ni) => { if (n.ecart) h += `<li><button data-go="s${fi}-${gi}-${ni}"><span>${esc(f.titre)} · <b>${esc(n.titre)}</b><br><span class="ev">${esc(n.ecart.constat)}</span></span></button></li>`; })));
+      h += "</ul>";
     } else if (sel === "depot") {
       const l = projet.lecture, d = projet.depot;
       h += `<span class="ey">Dépôt GitHub · lecture seule</span>`;
@@ -150,14 +156,38 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         <div><span class="lb">À quoi ça sert</span><p>${esc(n.aQuoiCaSert)}</p></div>
         <div><span class="lb">Où on en est</span><p>${esc(n.ouOnEnEst)}</p></div>
         ${n.citation ? `<div><span class="lb">D'après votre description</span><blockquote>« ${esc(n.citation)} »</blockquote></div>` : ""}
-        ${n.etat === "done" ? `<p class="ev">« Débloqué » veut dire construit${n.teste ? " et testé" : ""}, pas encore éprouvé en production.</p>` : ""}
-        ${n.etat === "todo" ? `<p class="ev">Proposition de l'outil, déduite de votre description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>` : ""}
-        ${listePreuves(n)}`;
+        ${n.ecart ? `<div class="dr"><b>Écart avec votre description.</b> ${n.ecart.citation ? `Vous avez écrit : « ${esc(n.ecart.citation)} ». ` : ""}${esc(n.ecart.constat)}</div>` : ""}`;
+      const qui = (ts) => `<ul class="who">${ts.map((t) => `<li><b>${esc(t.qui)}</b><span>${esc(t.quoi)}</span></li>`).join("")}</ul>`;
+      if (n.etat === "done") {
+        const livraisons = (n.preuves ?? []).filter((p) => p.type === "fusion" && p.etat === "fusionnee");
+        if (n.commentCaMarche) h += `<div class="tech"><span class="lb">Comment ça marche</span><p>${esc(n.commentCaMarche)}</p></div>`;
+        h += `<div class="tech"><span class="lb">Qui l'a fait</span>${livraisons.length
+          ? `<ul class="who">${livraisons.map((p) => `<li><b>${esc(p.auteur)}</b><span>${esc(p.titre)} <i>n° ${p.numero} · fusionné le ${dateFr(p.date).slice(0, 5)}</i></span></li>`).join("")}</ul>`
+          : `<p>${f.responsable ? `Famille portée par ${esc(f.responsable)}. ` : ""}Pas de livraison précise identifiée.</p>`}</div>
+          <p class="ev">« Débloqué » veut dire construit${n.teste ? " et testé" : ""}, pas encore éprouvé en production.</p>`;
+      } else if (n.etat === "wip") {
+        if (n.commentCaMarche) h += `<div class="tech"><span class="lb">Ce qui existe déjà</span><p>${esc(n.commentCaMarche)}</p></div>`;
+        h += `<div class="tech"><span class="lb">Qui doit faire quoi</span>${n.taches?.length ? qui(n.taches) : '<p class="ev">Non vérifié : l\'outil n\'a pas su dire ce qu\'il reste à faire.</p>'}</div>`;
+      } else if (n.etat === "todo") {
+        if (n.horsCode) h += `<p class="ev">Ce n'est pas du code à écrire : c'est une démarche ou une décision.</p>`;
+        if (n.decision) h += `<div class="tech"><span class="lb">Décision à prendre avant</span><p>${esc(n.decision)}</p></div>`;
+        if (n.taches?.length) h += `<div class="tech"><span class="lb">Qui doit faire quoi${n.prompt ? " avant" : ""}</span>${qui(n.taches)}</div>`;
+        if (n.prompt) h += `<div class="tech"><span class="lb">Prompt pour le réaliser, aligné sur le dépôt</span><pre id="pr">${esc(n.prompt)}</pre><button class="cp" id="cp">Copier le prompt</button><p class="ev" style="margin-top:8px">À coller dans votre propre outil de développement. Carte produit ne lance rien lui-même.</p></div>`;
+        if (!n.nonVerifie && n.origine !== "depot") h += `<p class="ev">Proposition de l'outil, déduite de votre description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>`;
+      }
+      if (n.origine === "depot") h += `<p class="ev">Trouvé dans le dépôt : cette case ne vient pas de votre description.</p>`;
+      h += listePreuves(n);
     }
     const fam = sel[0] === "f" || sel[0] === "s" ? COULEURS[parseInt(sel.slice(1)) % COULEURS.length] : null;
     el.style.setProperty("--fc", fam ? fam[0] : "#1b1f2a"); el.style.setProperty("--ft", fam ? fam[1] : "#f2f4f7");
     el.innerHTML = h; el.hidden = false;
     el.querySelector(".x").onclick = () => { sel = null; render(); };
+    const cp = el.querySelector("#cp");
+    if (cp) cp.onclick = () => {
+      const pre = el.querySelector("#pr");
+      const repli = () => { const r = document.createRange(); r.selectNodeContents(pre); const g = getSelection(); g.removeAllRanges(); g.addRange(r); cp.textContent = "Texte sélectionné : copiez-le"; };
+      try { navigator.clipboard.writeText(pre.textContent).then(() => { cp.textContent = "Copié"; }, repli); } catch { repli(); }
+    };
     const go = el.querySelector("#gh-go");
     if (go) go.onclick = async () => {
       go.disabled = true;
@@ -206,7 +236,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     b.innerHTML = l?.enCours ? `<i class="lg w"></i><span>${esc(l.message)}</span>` : projet.depot?.sha ? `<span>Dépôt ${esc(projet.depot.nom)}</span>` : `<span>Connecter GitHub</span>`;
     b.setAttribute("aria-pressed", sel === "depot");
   }
-  $("#gh").onclick = () => { sel = sel === "depot" ? null : "depot"; render(); };
+  $("#gh").onclick = () => { ecartsOn = false; sel = sel === "depot" ? null : "depot"; render(); };
+  $("#dt").onclick = () => { ecartsOn = !ecartsOn; sel = ecartsOn ? "ecarts" : null; render(); };
   let minuterie = 0;
   function suivre() {
     clearTimeout(minuterie);

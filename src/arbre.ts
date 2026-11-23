@@ -55,7 +55,23 @@ export interface Case {
   teste: boolean;
   /** Preuves contrôlées dans le dépôt. */
   preuves: Preuve[];
+  /** D'où vient la case : de la description, ou d'une chose trouvée dans le dépôt dont la description ne parle pas. */
+  origine: "description" | "depot";
+  /** Deux phrases sur ce qui existe (case débloquée ou en cours). */
+  commentCaMarche: string;
+  /** Qui doit faire quoi, tâche par tâche. */
+  taches: { qui: string; quoi: string }[];
+  /** Vrai si ce n'est pas du code à écrire : démarche, décision, réglage chez un prestataire. */
+  horsCode: boolean;
+  /** Décision à prendre avant de coder, s'il y en a une. */
+  decision: string;
+  /** Ce que la description demande et que le dépôt fait autrement. */
+  ecart: Ecart | null;
+  /** Prompt prêt à copier, pour une case à débloquer qui est du code. */
+  prompt: string | null;
 }
+export interface Ecart { citation: string | null; constat: string }
+export const FICHE_VIDE = { origine: "description" as const, commentCaMarche: "", taches: [], horsCode: false, decision: "", ecart: null, prompt: null };
 export interface Theme { id: string; titre: string; cases: Case[] }
 export interface Famille {
   id: string; titre: string; description: string; responsable: string | null;
@@ -123,7 +139,7 @@ export function normaliserArbre(brut: ArbreIA, description: string): Arbre {
         cases.push({
           id: id(), titre, aQuoiCaSert: propre(c.aQuoiCaSert), ouOnEnEst: regle.texte,
           etat: regle.etat, citation: citationVerifiee(c.citation, description),
-          base: regle.etat, nonVerifie: false, teste: false, preuves: [],
+          base: regle.etat, nonVerifie: false, teste: false, preuves: [], ...FICHE_VIDE,
         });
       }
       if (cases.length) themes.push({ id: id(), titre: titrePropre(t.titre, 40), cases });

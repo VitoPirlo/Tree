@@ -7,7 +7,7 @@ on décrit son projet, l'outil en tire un arbre, puis le remplit à partir du d�
 
 - Étape 1 (faite) : description → questions → arbre vide, affiché comme le prototype.
 - Étape 2 (faite) : connexion GitHub en lecture seule, états et preuves.
-- Étape 3 : fiches complètes, écarts, prompts.
+- Étape 3 (faite) : fiches complètes, écarts, prompts.
 - Étape 4 : mise à jour, résumé des changements, corrections à la main.
 
 ## Lancer l'outil

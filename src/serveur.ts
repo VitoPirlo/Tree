@@ -43,7 +43,8 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     if (lectures.get(projet.id)?.enCours || !projet.arbre) return;
     const suivi: Lecture = { enCours: true, message: "Connexion au dépôt…", erreur: null };
     lectures.set(projet.id, suivi);
-    lireDepot({ description: projet.description, arbre: projet.arbre }, depot, ia, base.cache, (m) => { suivi.message = m; })
+    const precisions = projet.questions.map((q, i) => (projet.reponses[i]?.trim() ? `${q.question} ${projet.reponses[i].trim()}` : "")).filter(Boolean).join("\n");
+    lireDepot({ description: projet.description, precisions, arbre: projet.arbre }, depot, ia, base.cache, (m) => { suivi.message = m; })
       .then((r) => { base.enregistrerLecture(projet.id, r); lectures.delete(projet.id); })
       .catch((e) => {
         suivi.enCours = false;

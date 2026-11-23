@@ -9,8 +9,11 @@ import { ARBRE_DEMO, QUESTIONS_DEMO, planDemo, jugementDemo } from "./demo.ts";
 import type { ContexteJugement, ContextePlan, IALecture } from "./lecture.ts";
 
 /** Où regarder pour chaque case. */
+const pistes = { fichiers: zod.array(zod.string()), fusions: zod.array(zod.number()), branches: zod.array(zod.string()) };
 const PlanIA = zod.object({
-  cases: zod.array(zod.object({ ref: zod.string(), fichiers: zod.array(zod.string()), fusions: zod.array(zod.number()), branches: zod.array(zod.string()) })),
+  depot: zod.object({ presentation: zod.string(), regles: zod.string() }),
+  cases: zod.array(zod.object({ ref: zod.string(), ...pistes })),
+  ajouts: zod.array(zod.object({ famille: zod.string(), theme: zod.string(), titre: zod.string(), aQuoiCaSert: zod.string(), ...pistes })),
 });
 /** L'avis de l'IA sur chaque case, avec les preuves qu'elle avance. Le code les contrôle ensuite une à une. */
 const JugementIA = zod.object({
@@ -19,6 +22,12 @@ const JugementIA = zod.object({
     avis: zod.enum(["fait", "en_cours", "pas_fait", "incertain"]),
     ouOnEnEst: zod.string(),
     preuves: zod.array(zod.object({ type: zod.enum(["fichier", "test", "fusion", "branche"]), chemin: zod.string(), extrait: zod.string(), numero: zod.number() })),
+    commentCaMarche: zod.string(),
+    nature: zod.enum(["code", "hors_code"]),
+    decision: zod.string(),
+    taches: zod.array(zod.object({ qui: zod.string(), quoi: zod.string() })),
+    ecart: zod.object({ citation: zod.string(), constat: zod.string(), chemin: zod.string(), extrait: zod.string(), numero: zod.number() }),
+    prompt: zod.object({ objectif: zod.string(), ouIntervenir: zod.string(), aReutiliser: zod.string(), reussiQuand: zod.string(), attention: zod.string() }),
   })),
 });
 
@@ -68,7 +77,11 @@ Pour chaque case, rends :
 - fusions : les numéros des demandes de fusion qui portent sur cette case, fusionnées ou ouvertes.
 - branches : les branches, hors branche principale, où cette case semble en chantier.
 
-Si rien dans le dépôt ne semble toucher à une case, laisse ses trois listes vides : c'est une information utile, pas un échec. Rends une entrée par case, avec sa référence.`;
+Si rien dans le dépôt ne semble toucher à une case, laisse ses trois listes vides : c'est une information utile, pas un échec. Rends une entrée par case, avec sa référence.
+
+« ajouts » : ce que le dépôt fait pour ses utilisateurs et dont la description ne parle pas, ou qu'elle exclut. C'est précieux pour lui : il découvre ce qui a été construit sans qu'il le demande. Au plus 8, les plus significatifs, et seulement des services rendus visibles dans les fichiers ou les demandes de fusion, pas des détails techniques. Pour chacun : la famille (son titre exact), le thème (un titre existant de cette famille, ou un nouveau), un titre et un « à quoi ça sert » dans le même langage que les cases, et les mêmes trois listes. N'ajoute rien qui recoupe une case existante.
+
+« depot » : « presentation » décrit le dépôt en une courte phrase pour un développeur qui le découvre (langages, grandes parties). « regles » reprend en un paragraphe les règles de travail écrites dans la documentation fournie (fichiers AGENTS.md, CONTRIBUTING.md, README) : comment créer une branche, ouvrir une demande de fusion, tester, ce qui est interdit ou réservé à quelqu'un. Seulement ce qui y est écrit : si la documentation ne donne aucune règle, laisse vide.`;
 
 const SYSTEME_JUGEMENT = `${REGLES_COMMUNES}
 
@@ -88,6 +101,23 @@ Laisse vides les champs inutiles pour le type (chaîne vide, ou 0 pour le numér
 
 « ouOnEnEst » : une ou deux phrases courtes, sans jargon et sans nom de fichier, qui disent seulement ce que tes preuves montrent. Si quelque chose limite le service (désactivé par défaut, réservé à un essai, une partie manquante), dis-le. Pour une case « pas_fait », dis en une phrase ce qui manque.
 
+Selon ton avis, remplis aussi la fiche de la case. Laisse vide (chaîne vide, liste vide) tout ce qui ne s'applique pas.
+
+- « commentCaMarche » (avis « fait » ou « en_cours ») : deux phrases, sans jargon, sur la façon dont le produit rend ce service aujourd'hui. Pour « en_cours », ce qui existe déjà.
+- « taches » : qui doit faire quoi, une tâche par entrée, concrète et courte. Pour « en_cours », ce qu'il reste à faire pour terminer. Pour « pas_fait », seulement ce que des personnes doivent faire avant ou à côté du code : ouvrir un compte chez un prestataire, donner un accord, trancher un choix. « qui » est un prénom ou un nom pris dans la description, les réponses, le responsable de la famille ou les auteurs des demandes de fusion ; laisse « qui » vide si tu ne sais pas, ne devine pas.
+- « nature » : « hors_code » si débloquer la case n'est pas du code à écrire (démarche, décision, réglage chez un prestataire), sinon « code ».
+- « decision » (avis « pas_fait ») : s'il faut trancher quelque chose avant de coder, la question à trancher, en une phrase. Sinon vide.
+- « prompt » (avis « pas_fait » et nature « code ») : les éléments d'une consigne qu'il copiera dans son propre outil de développement, pour un développeur ou un agent IA qui connaît le métier mais pas ce dépôt. Sers-toi de ce que tu as lu : la liste des fichiers et la documentation sont fournies.
+  - « objectif » : ce qu'il faut obtenir, en une phrase.
+  - « ouIntervenir » : les fichiers ou dossiers existants où le travail se fait, par leur chemin exact, et ceux à prendre comme modèle.
+  - « aReutiliser » : ce qui existe déjà dans le dépôt et qu'il ne faut pas reconstruire.
+  - « reussiQuand » : des critères qu'on peut vérifier, tests compris.
+  - « attention » : dépendances envers d'autres cases, accords à obtenir, pièges. Vide s'il n'y en a pas.
+  Les règles de travail du dépôt sont ajoutées automatiquement : ne les répète pas.
+- « ecart » : remplis-le quand la description demande une chose et que le dépôt en fait une autre (une durée, une limite, une façon de faire différentes, une chose exclue par la description mais construite). « citation » est la phrase de la description, recopiée mot pour mot. « constat » dit en une phrase simple ce que le dépôt fait réellement, sur le modèle « Aujourd'hui, … ». Appuie le constat sur une preuve : « chemin » et « extrait » d'un fichier fourni (mêmes exigences que plus haut), ou « numero » d'une demande de fusion. Un écart sans phrase exacte de la description ou sans preuve sera écarté. Ne signale pas comme écart ce qui est simplement « pas encore fait ».
+
+Les cases marquées « trouvée dans le dépôt » ne viennent pas de la description : dis simplement si elles sont construites, preuves à l'appui.
+
 Rends une entrée par case, avec sa référence.`;
 
 const lignesFusions = (c: { fusions: ContextePlan["fusions"] }, corps: boolean) =>
@@ -99,7 +129,8 @@ class IAAnthropic implements IA {
   modeDemo = false;
   private client = new Anthropic();
 
-  private async appel<S extends z.ZodType>(schema: S, systeme: string, message: string, effort: "medium" | "high"): Promise<z.infer<S>> {
+  /** « commun » est la partie du message identique d'un appel à l'autre : elle est mise en cache côté IA. */
+  private async appel<S extends z.ZodType>(schema: S, systeme: string, message: string, effort: "medium" | "high", commun?: string): Promise<z.infer<S>> {
     try {
       // En flux, pour ne pas buter sur un délai d'attente quand l'arbre est long à écrire.
       const flux = this.client.beta.messages.stream({
@@ -111,7 +142,12 @@ class IAAnthropic implements IA {
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: systeme,
-        messages: [{ role: "user", content: message }],
+        messages: [{
+          role: "user",
+          content: commun
+            ? [{ type: "text", text: commun, cache_control: { type: "ephemeral" } }, { type: "text", text: message }]
+            : message,
+        }],
       });
       const reponse = await flux.finalMessage();
       if (reponse.stop_reason === "refusal") throw new ErreurIA("L'IA a refusé de traiter cette description.");
@@ -135,14 +171,15 @@ class IAAnthropic implements IA {
   planifier(c: ContextePlan) {
     const cases = c.cases.map((x) => `${x.ref} · ${x.titre} : ${x.aQuoiCaSert}`).join("\n");
     return this.appel(PlanIA, SYSTEME_PLAN,
-      `<description>\n${c.description}\n</description>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>`, "medium");
+      `<description>\n${c.description}\n</description>\n\n<familles_et_themes>\n${c.familles.map((f) => `${f.titre} : ${f.themes.join(" ; ")}`).join("\n")}\n</familles_et_themes>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>`, "medium");
   }
 
   juger(c: ContexteJugement) {
     const cases = c.cases.map((x) =>
-      `${x.ref} · ${x.titre} : ${x.aQuoiCaSert}${x.citation ? `\n  Ce que dit la description : « ${x.citation} »` : ""}\n  À regarder : fichiers ${x.fichiers.join(", ") || "aucun"} ; demandes de fusion ${x.fusions.join(", ") || "aucune"} ; branches ${x.branches.join(", ") || "aucune"}`).join("\n\n");
+      `${x.ref} · ${x.titre}${x.origine === "depot" ? " (trouvée dans le dépôt)" : ""} : ${x.aQuoiCaSert}${x.citation ? `\n  Ce que dit la description : « ${x.citation} »` : ""}\n  À regarder : fichiers ${x.fichiers.join(", ") || "aucun"} ; demandes de fusion ${x.fusions.join(", ") || "aucune"} ; branches ${x.branches.join(", ") || "aucune"}`).join("\n\n");
     return this.appel(JugementIA, SYSTEME_JUGEMENT,
-      `Famille : ${c.famille}. Branche principale : ${c.brancheDefaut}.\n\n<cases>\n${cases}\n</cases>\n\n<fichiers>\n${blocFichiers(c.fichiers)}\n</fichiers>\n\n<demandes_de_fusion>\n${lignesFusions(c, true)}\n</demandes_de_fusion>`, "high");
+      `Famille : ${c.famille}. Responsable de la famille : ${c.responsable || "non précisé"}. Branche principale : ${c.brancheDefaut}.\n\n<cases>\n${cases}\n</cases>\n\n<fichiers>\n${blocFichiers(c.fichiers)}\n</fichiers>\n\n<demandes_de_fusion>\n${lignesFusions(c, true)}\n</demandes_de_fusion>`, "high",
+      `<description>\n${c.commun.description}\n</description>\n\n<documentation>\n${blocFichiers(c.commun.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.commun.chemins.join("\n")}\n</fichiers_du_depot>`);
   }
 
   genererArbre(description: string, reponses: { question: Question; reponse: string }[]) {
