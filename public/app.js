@@ -38,23 +38,27 @@ async function ecranProjets() {
     ${projets.length ? `<h2>Vos projets</h2><ul class="list">${projets.map((p) => `<li><a href="#/p/${p.id}"><span>${esc(p.nom)}</span><small>${p.etape === "arbre" ? "Arbre prêt" : "Questions en attente"} · ${new Date(p.creeLe).toLocaleDateString("fr-FR")}</small></a></li>`).join("")}</ul>` : `<p class="sub">Aucun projet pour l'instant.</p>`}`);
 }
 
-const PROMPT_DESCRIPTION = `Décris le produit sur lequel nous travaillons, pour quelqu'un qui ne lit pas le code. Je vais coller ta réponse dans un outil qui en tire la carte du produit, partie par partie, puis la compare à ce qui est réellement construit.
+const PROMPT_DESCRIPTION = `Tu connais ce projet. Fais comme un développeur qui le reprend et qui pose le plan de travail : « voici les grands chantiers, et dans chacun, les sujets à traiter ». Je vais coller ta réponse dans un outil qui en tire un arbre : le produit, ses chantiers, leurs sujets, puis ce qu'il y a à faire dans chaque sujet.
 
-Décris le produit lui-même : ce qu'il doit faire. Pas la vision, pas le marché, pas les clients visés, pas les arguments de vente.
+Écris-le dans cet ordre :
 
-1. Commence par deux phrases : ce que fait le produit, et pour qui.
-2. Liste ensuite ses grandes parties (entre 4 et 8). Pour chacune, écris en phrases simples ce que le produit doit faire pour la personne qui s'en sert. Une chose précise par phrase, que l'on pourra un jour déclarer « faite » ou « pas faite ». Donne les règles chiffrées quand il y en a : durées, limites, délais.
-3. Dis ce qui fait partie de cette version, ce qui est repoussé à plus tard, et ce qui est exclu.
-4. Dis qui construit quelle partie : personnes, prestataires, agents IA.
-5. Dis ce qui ne se fait pas dans le code : démarches, prospection, recrutement.
+1. Deux phrases : ce que fait le produit, et pour qui.
 
-Décris ce que le produit doit faire, pas ce qui est déjà construit. Même si tu connais le code, ne retire rien parce que ce n'est pas encore fait, et n'ajoute rien parce que le code le fait déjà : l'outil se charge de la comparaison. Si tu ne sais pas ce qui était prévu sur un point, dis-le plutôt que de le déduire du code.
+2. Les grands chantiers du projet, entre 4 et 8. Un chantier est une grande partie du produit qu'une personne ou une équipe peut porter : par exemple la collecte des données, l'analyse, l'espace client, la facturation, les outils internes, la mise en production. Donne à chacun un nom court et une phrase sur son enjeu, et dis qui le porte (personne, prestataire, agent IA) si c'est décidé.
 
-Écris en français, sans jargon technique et sans nom de fichier. Du texte simple, sans tableau, entre 300 et 600 mots.`;
+3. Dans chaque chantier, les sujets à traiter, entre 2 et 6. Pour chaque sujet, écris en phrases simples ce que le produit doit faire : une chose précise par phrase, que l'on pourra un jour déclarer « faite » ou « pas faite ». Donne les règles chiffrées quand il y en a : durées, limites, délais.
+
+4. Ce qui est repoussé après cette version, et ce qui est exclu.
+
+5. Ce qui ne se fait pas dans le code : démarches, prospection, recrutement.
+
+Couvre tout le projet, y compris ce qui est invisible pour l'utilisateur (fiabilité, sécurité, outils de l'équipe). Liste aussi bien ce qui est déjà construit que ce qui reste à faire, sans dire où en est chaque point : l'outil le vérifiera lui-même dans le code. Si tu ne sais pas ce qui était prévu sur un sujet, dis-le plutôt que de l'inventer.
+
+Écris en français, pour quelqu'un qui ne lit pas le code : sans jargon technique, sans nom de fichier ni de technologie. Pas de vision, de marché ni d'arguments de vente. Du texte simple avec des titres de chantiers, sans tableau, entre 400 et 800 mots.`;
 
 function ecranDecrire() {
   page(`${etapes(0)}<h1>Décrivez votre produit</h1>
-    <p class="sub">Dites ce que le produit doit faire, partie par partie. Pas la vision ni le marché : l'outil a besoin de ce qu'il faut construire.</p>${demo()}
+    <p class="sub">Listez les grands chantiers du projet et, dans chacun, les sujets à traiter. Pas la vision ni le marché : l'outil a besoin de ce qu'il faut construire.</p>${demo()}
     <details class="panel aide" open><summary>Une IA travaille déjà sur votre projet ? Faites-lui écrire la description</summary>
       <p class="sub">Copiez ce prompt, donnez-le à l'IA qui connaît votre projet (Claude, ChatGPT, Cursor…), puis collez sa réponse ci-dessous. Relisez-la : c'est votre description, pas la sienne.</p>
       <pre id="pd"></pre><div class="row"><button type="button" class="btn ghost" id="cpd">Copier le prompt</button></div></details>

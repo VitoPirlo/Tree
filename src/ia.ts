@@ -65,7 +65,7 @@ Chaque question est courte, porte sur un seul sujet, et on peut y répondre en u
 
 const SYSTEME_ARBRE = `${REGLES_COMMUNES}
 
-Dessine l'arbre de son produit à partir de sa description et de ses réponses. L'arbre a trois niveaux sous le produit : des familles (les grandes parties du produit, en général 4 à 8), dans chaque famille des thèmes (1 à 6), dans chaque thème des cases (1 à 10). Une case est une chose précise que le produit fait pour quelqu'un, assez petite pour être un jour « faite » ou « pas faite ».
+Dessine l'arbre de son produit à partir de sa description et de ses réponses. L'arbre a trois niveaux sous le produit : des familles (les grands chantiers du projet, tels qu'un développeur qui le reprend les découperait, en général 4 à 8 ; si la description liste déjà ses chantiers et leurs sujets, suis ce découpage), dans chaque famille des thèmes (1 à 6), dans chaque thème des cases (1 à 10). Une case est une chose précise que le produit fait pour quelqu'un, assez petite pour être un jour « faite » ou « pas faite ».
 
 Le lecteur ne lit pas le code. Chaque titre dit ce que le produit fait pour son utilisateur, avec les mots de cet utilisateur : « Savoir ce qui est normal », pas « Indicateurs et valeur de référence » ; « Lire les échanges Slack », pas « Connecteur Slack ». Un titre de case fait moins de 45 caractères et commence de préférence par un verbe. Un titre de thème fait moins de 30 caractères et nomme un sujet, jamais un calendrier : pas de thème « Plus tard » ou « Hors périmètre », une case repoussée se range dans le thème dont elle parle. Même les parties invisibles du produit (fiabilité, sécurité, outils internes) se décrivent par ce qu'elles garantissent : « Chaque client ne voit que ses données ».
 
