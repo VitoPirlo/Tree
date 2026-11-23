@@ -68,6 +68,10 @@ export function ouvrirBase(fichier?: string) {
       db.prepare("UPDATE projets SET arbre=? WHERE id=?").run(JSON.stringify(r.arbre), id);
       db.prepare("UPDATE depots SET info=? WHERE projet_id=?").run(JSON.stringify(r.depot), id);
     },
+    /** Enregistre l'arbre après une correction à la main, sans toucher au reste. */
+    enregistrerCorrection(id: string, arbre: Arbre) {
+      db.prepare("UPDATE projets SET arbre=? WHERE id=?").run(JSON.stringify(arbre), id);
+    },
     cache: {
       lire(cle: string): string | null {
         const c: any = db.prepare("SELECT valeur FROM cache WHERE cle = ?").get(cle);

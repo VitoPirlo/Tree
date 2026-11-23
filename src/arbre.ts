@@ -69,7 +69,13 @@ export interface Case {
   ecart: Ecart | null;
   /** Prompt prêt à copier, pour une case à débloquer qui est du code. */
   prompt: string | null;
+  /** Correction faite à la main par l'utilisateur. Elle est conservée d'une lecture du dépôt à l'autre. */
+  corrige?: Correction | null;
+  /** Quand l'état est corrigé à la main : l'état que l'outil, lui, a tiré du dépôt. */
+  etatLu?: Etat;
 }
+/** « etat » est nul si seule la formulation a été corrigée. « avant » garde le texte d'origine, pour pouvoir annuler. */
+export interface Correction { etat: Etat | null; avant: { titre: string; aQuoiCaSert: string }; le: string }
 export interface Ecart { citation: string | null; constat: string }
 export const FICHE_VIDE = { origine: "description" as const, commentCaMarche: "", taches: [], horsCode: false, decision: "", ecart: null, prompt: null };
 export interface Theme { id: string; titre: string; cases: Case[] }

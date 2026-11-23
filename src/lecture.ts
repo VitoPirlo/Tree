@@ -57,7 +57,9 @@ async function avecCache<T>(cache: Cache, cle: string, calcul: () => Promise<T>)
   return valeur;
 }
 
-export interface ResultatLecture { arbre: Arbre; depot: InfoDepot & { luLe: string; fichiersIgnores: number } }
+/** Ce qui a changé entre deux lectures du dépôt, en phrases prêtes à afficher. */
+export interface Changements { depuis: string; lignes: string[] }
+export interface ResultatLecture { arbre: Arbre; depot: InfoDepot & { luLe: string; fichiersIgnores: number; changements?: Changements | null } }
 
 export async function lireDepot(
   entree: { description: string; precisions?: string; arbre: Arbre }, depot: Depot, ia: IALecture, cache: Cache, progres: (message: string) => void = () => {},

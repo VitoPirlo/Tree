@@ -11,6 +11,7 @@ import { creerIA, ErreurIA, type IA } from "./ia.ts";
 import { DEPOT_DEMO, DESCRIPTION_DEMO } from "./demo.ts";
 import { DepotGitHub, ErreurDepot, lireNomDepot, type Depot } from "./github.ts";
 import { lireDepot } from "./lecture.ts";
+import { annulerCorrection, apresLecture, avantLecture, corrigerCase } from "./suivi.ts";
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
@@ -44,8 +45,10 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     const suivi: Lecture = { enCours: true, message: "Connexion au dépôt…", erreur: null };
     lectures.set(projet.id, suivi);
     const precisions = projet.questions.map((q, i) => (projet.reponses[i]?.trim() ? `${q.question} ${projet.reponses[i].trim()}` : "")).filter(Boolean).join("\n");
+    // Une copie de l'arbre d'avant, pour remettre les corrections à la main et dire ce qui a changé.
+    const avant = avantLecture(projet.arbre), lectureDavant = projet.depot?.luLe;
     lireDepot({ description: projet.description, precisions, arbre: projet.arbre }, depot, ia, base.cache, (m) => { suivi.message = m; })
-      .then((r) => { base.enregistrerLecture(projet.id, r); lectures.delete(projet.id); })
+      .then((r) => { r.depot.changements = apresLecture(avant, r.arbre, lectureDavant); base.enregistrerLecture(projet.id, r); lectures.delete(projet.id); })
       .catch((e) => {
         suivi.enCours = false;
         suivi.erreur = e instanceof ErreurDepot || e instanceof ErreurIA ? e.message : "La lecture du dépôt a échoué. Réessayez.";
@@ -77,7 +80,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       const questions = normaliserQuestions(await ia.poserQuestions(description));
       return vue(base.creer(description, questions, ia.modeDemo));
     }
-    const un = /^\/api\/projets\/([\w-]+)(\/reponses|\/depot|\/lecture)?$/.exec(chemin);
+    const un = /^\/api\/projets\/([\w-]+)(\/reponses|\/depot|\/lecture|\/cases\/[\w-]+)?$/.exec(chemin);
     if (un) {
       const projet = base.trouver(un[1]);
       if (!projet) throw new ErreurHttp(404, "Projet introuvable.");
@@ -101,6 +104,15 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
         if (!depot) throw new ErreurHttp(400, "Aucun dépôt n'est connecté à ce projet.");
         lancerLecture(projet, depot);
         return vue(projet);
+      }
+      if (un[2]?.startsWith("/cases/") && m === "POST") {
+        if (lectures.get(projet.id)?.enCours) throw new ErreurHttp(409, "Une lecture du dépôt est en cours. Corrigez la case quand elle sera terminée.");
+        const laCase = projet.arbre?.familles.flatMap((f) => f.themes.flatMap((t) => t.cases)).find((c) => c.id === un[2]!.slice(7));
+        if (!projet.arbre || !laCase) throw new ErreurHttp(404, "Case introuvable.");
+        const recu = await corps(req);
+        if (recu.annuler) annulerCorrection(laCase); else corrigerCase(laCase, recu);
+        base.enregistrerCorrection(projet.id, projet.arbre);
+        return vue(base.trouver(projet.id)!);
       }
       if (un[2] === "/reponses" && m === "POST") {
         const recues = (await corps(req)).reponses;
@@ -138,7 +150,10 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const ia = creerIA();
   const port = Number(process.env.PORT ?? 3000);
-  creerServeur(ouvrirBase(), ia).listen(port, () => {
+  // Sans mot de passe, l'outil ne répond qu'à cet ordinateur : il ne peut pas se retrouver en ligne ouvert à tous.
+  const protege = !!process.env.APP_PASSWORD;
+  creerServeur(ouvrirBase(), ia).listen(port, protege ? "0.0.0.0" : "127.0.0.1", () => {
     console.log(`Carte produit : http://localhost:${port}${ia.modeDemo ? " (mode démonstration : aucune clé Anthropic)" : ""}`);
+    if (!protege) console.log("Aucun mot de passe (APP_PASSWORD) : l'outil n'est accessible que depuis cet ordinateur.");
   });
 }

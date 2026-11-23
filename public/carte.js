@@ -52,13 +52,13 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     <div class="top">
       <div class="hud">
         <a class="chip" href="#/" aria-label="Retour aux projets">←</a>
-        <div class="chip"><h1>Carte produit ${esc(arbre.produit.nom)}</h1></div>
+        <div class="chip"><h1>${/^carte produit/i.test(arbre.produit.nom) ? "" : "Carte produit "}${esc(arbre.produit.nom)}</h1></div>
         <div class="chip k"><i class="lg"></i><b id="c1"></b> débloqués</div>
         <div class="chip k"><i class="lg w"></i><b id="c2"></b> en cours</div>
         <div class="chip k"><i class="lg t"></i><b id="c3"></b> à débloquer</div>
         ${projet.demo ? '<div class="chip demo">Exemple de démonstration</div>' : ""}
       </div>
-      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="gh"></button></div>
+      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="maj" hidden>Mettre à jour</button><button class="tg depot" id="gh"></button></div>
     </div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
@@ -74,7 +74,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     const g = stat(F.flatMap(toutes)), pct = Math.round(part(g.done, g.tot)), C = 2 * Math.PI * 46;
     let y = TOP, lastF = 0;
     const rcy = TOP + RS / 2;
-    html += `<button class="nd root" data-k="root" style="left:${RX}px;top:${TOP}px"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="#e6e9ee" stroke-width="7"/><circle cx="50" cy="50" r="46" fill="none" stroke="#1b1f2a" stroke-width="7" stroke-linecap="round" stroke-dasharray="${part(g.done, g.tot) / 100 * C} ${C}"/></svg><em>${esc(arbre.produit.nom)}</em><b>${pct} %</b><span>${g.done} sur ${g.tot}</span></button>`;
+    html += `<button class="nd root" data-k="root" style="left:${RX}px;top:${TOP}px"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="#e6e9ee" stroke-width="7"/><circle cx="50" cy="50" r="46" fill="none" stroke="#1b1f2a" stroke-width="7" stroke-linecap="round" stroke-dasharray="${part(g.done, g.tot) / 100 * C} ${C}"/></svg><em${arbre.produit.nom.length > 11 ? ' style="font-size:11px;max-width:112px;line-height:1.15"' : ""}>${esc(arbre.produit.nom)}</em><b>${pct} %</b><span>${g.done} sur ${g.tot}</span></button>`;
     lines += `<path class="ln" d="M${RX + RS} ${rcy} H${TRUNK}"/>`;
     y = TOP + (RS - FH) / 2;
     F.forEach((f, fi) => {
@@ -88,7 +88,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         const gcy = gy + SH / 2, gs = stat(t.cases), gcl = gs.done ? "done" : "";
         lines += gi === 0 ? `<path class="ln ${gcl}" d="M${FX + FW} ${fcy} H${GX}"/>` : `<path class="ln ${gcl}" d="M${BUS} ${gcy - 12} Q${BUS} ${gcy} ${BUS + 12} ${gcy} H${GX}"/>`;
         lastG = gcy;
-        html += `<span class="gp${ecartsOn && !gs.ecarts ? " dim" : ""}" style="${sty};left:${GX}px;top:${gcy - GH / 2}px;width:${GW}px;height:${GH}px">${esc(t.titre)}</span>`;
+        html += `<span class="gp${ecartsOn && !gs.ecarts ? " dim" : ""}" style="${sty};left:${GX}px;top:${gcy - GH / 2}px;width:${GW}px;height:${GH}px" title="${esc(t.titre)}"><span>${esc(t.titre)}</span></span>`;
         steps.forEach((n, k) => {
           const r = Math.floor(k / PER), col = k % PER, x = STX + col * SX, sy = gy + r * ROWH, cy = sy + SH / 2;
           if (col === 0) {
@@ -96,7 +96,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
             else { const ex = GX + GW + 14; lines += `<path class="ln ${n.etat}" d="M${ex} ${gcy} V${cy - 12} Q${ex} ${cy} ${ex + 12} ${cy} H${x}"/>`; }
           } else lines += `<path class="ln ${n.etat}" d="M${x - (SX - SW)} ${cy} H${x}"/>`;
           const key = `s${fi}-${gi}-${n.i}`;
-          html += `<button class="nd st ${n.etat}${ecartsOn && !n.ecart ? " dim" : ""}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span>${n.ecart ? '<i class="fl nv ec" title="Écart avec la description">!</i>' : n.nonVerifie ? '<i class="fl nv" title="Non vérifié">?</i>' : ""}</button>`;
+          html += `<button class="nd st ${n.etat}${ecartsOn && !n.ecart ? " dim" : ""}" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}" style="${sty};left:${x}px;top:${sy}px;width:${SW}px;height:${SH}px"><span class="hex">${I[n.etat]}</span><span>${esc(n.titre)}</span>${n.ecart ? '<i class="fl nv ec" title="Écart avec la description">!</i>' : n.nonVerifie ? '<i class="fl nv" title="Non vérifié">?</i>' : n.corrige ? '<i class="fl nv" title="Corrigé par vous">✎</i>' : ""}</button>`;
         });
         gy += Math.ceil(steps.length / PER) * ROWH + 6;
       });
@@ -135,7 +135,12 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       h += `<span class="ey">Dépôt GitHub · lecture seule</span>`;
       if (l?.enCours) h += `<h2>Lecture en cours</h2><p class="wait">${esc(l.message)}</p><p class="ev">Cela prend quelques minutes. Vous pouvez laisser cette page ouverte.</p>`;
       else if (d?.sha) h += `<h2>${esc(d.nom)}</h2><p>Branche ${esc(d.brancheDefaut)}, dernière modification le ${dateFr(d.dateDernierCommit)}. Lu le ${dateFr(d.luLe)}.</p>
-        ${d.ecriturePossible ? '<p class="dr"><b>Jeton trop large.</b> Ce jeton permet aussi d\'écrire dans le dépôt. L\'outil ne le fait jamais, mais un jeton en lecture seule est plus sûr.</p>' : '<p class="ev">L\'outil ne fait que lire : il ne peut rien modifier dans votre dépôt.</p>'}`;
+        ${d.ecriturePossible ? '<p class="dr"><b>Jeton trop large.</b> Ce jeton permet aussi d\'écrire dans le dépôt. L\'outil ne le fait jamais, mais un jeton en lecture seule est plus sûr.</p>' : '<p class="ev">L\'outil ne fait que lire : il ne peut rien modifier dans votre dépôt.</p>'}
+        ${l?.erreur ? `<p class="dr"><b>Mise à jour interrompue.</b> ${esc(l.erreur)}</p>` : ""}
+        ${d.changements ? `<div class="tech"><span class="lb">Ce qui a changé depuis la lecture du ${dateFr(d.changements.depuis)}</span>${d.changements.lignes.length
+          ? `<ul class="chg">${d.changements.lignes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
+          : "<p>Rien n'a changé : la carte est la même qu'à la lecture précédente.</p>"}</div>` : ""}
+        <div class="tech"><button class="cp" id="gh-maj">Mettre à jour</button><p class="ev" style="margin-top:8px">Relit le dépôt et résume ce qui a changé. Vos corrections à la main sont conservées.</p></div>`;
       else h += `<h2>Connecter votre dépôt</h2>${l?.erreur ? `<p class="dr"><b>Lecture interrompue.</b> ${esc(l.erreur)}</p>` : ""}
         ${projet.demo ? '<p>En mode démonstration, l\'outil lit un dépôt d\'exemple fourni avec lui.</p>' : `
         <p>L'outil lit votre dépôt pour vérifier, case par case, ce qui est réellement construit. Il ne peut rien y modifier.</p>
@@ -152,7 +157,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       h += "</ul>";
     } else {
       const [fi, gi, ni] = sel.slice(1).split("-").map(Number), f = F[fi], n = f.themes[gi].cases[ni];
-      h += `<span class="ey">${esc(f.titre)} · ${esc(f.themes[gi].titre)}</span><h2>${esc(n.titre)}</h2><span class="row-tags"><span class="tag ${n.etat}">${LABEL[n.etat]}</span>${n.nonVerifie ? '<span class="tag todo">Non vérifié</span>' : ""}</span>
+      h += `<span class="ey">${esc(f.titre)} · ${esc(f.themes[gi].titre)}</span><h2>${esc(n.titre)}</h2><span class="row-tags"><span class="tag ${n.etat}">${LABEL[n.etat]}</span>${n.nonVerifie ? '<span class="tag todo">Non vérifié</span>' : ""}${n.corrige ? '<span class="tag later">Corrigé par vous</span>' : ""}</span>
+        ${n.corrige?.etat ? `<p class="ev">Vous avez fixé cet état à la main. L'outil, lui, a lu dans le dépôt : « ${LABEL[n.etatLu]} ». Le texte ci-dessous est celui de l'outil.</p>` : ""}
         <div><span class="lb">À quoi ça sert</span><p>${esc(n.aQuoiCaSert)}</p></div>
         <div><span class="lb">Où on en est</span><p>${esc(n.ouOnEnEst)}</p></div>
         ${n.citation ? `<div><span class="lb">D'après votre description</span><blockquote>« ${esc(n.citation)} »</blockquote></div>` : ""}
@@ -164,7 +170,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         h += `<div class="tech"><span class="lb">Qui l'a fait</span>${livraisons.length
           ? `<ul class="who">${livraisons.map((p) => `<li><b>${esc(p.auteur)}</b><span>${esc(p.titre)} <i>n° ${p.numero} · fusionné le ${dateFr(p.date).slice(0, 5)}</i></span></li>`).join("")}</ul>`
           : `<p>${f.responsable ? `Famille portée par ${esc(f.responsable)}. ` : ""}Pas de livraison précise identifiée.</p>`}</div>
-          <p class="ev">« Débloqué » veut dire construit${n.teste ? " et testé" : ""}, pas encore éprouvé en production.</p>`;
+          ${n.corrige?.etat ? "" : `<p class="ev">« Débloqué » veut dire construit${n.teste ? " et testé" : ""}, pas encore éprouvé en production.</p>`}`;
       } else if (n.etat === "wip") {
         if (n.commentCaMarche) h += `<div class="tech"><span class="lb">Ce qui existe déjà</span><p>${esc(n.commentCaMarche)}</p></div>`;
         h += `<div class="tech"><span class="lb">Qui doit faire quoi</span>${n.taches?.length ? qui(n.taches) : '<p class="ev">Non vérifié : l\'outil n\'a pas su dire ce qu\'il reste à faire.</p>'}</div>`;
@@ -177,6 +183,13 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       }
       if (n.origine === "depot") h += `<p class="ev">Trouvé dans le dépôt : cette case ne vient pas de votre description.</p>`;
       h += listePreuves(n);
+      if (!projet.lecture?.enCours) h += `<details class="ev" id="cor"><summary>Corriger cette case</summary><div class="cor">
+        <label>État<select id="cor-etat">${Object.keys(LABEL).map((e) => `<option value="${e}"${e === n.etat ? " selected" : ""}>${LABEL[e]}</option>`).join("")}</select></label>
+        <label>Titre<input id="cor-titre" maxlength="60" value="${esc(n.titre)}"></label>
+        <label>À quoi ça sert<textarea id="cor-sert" rows="3" maxlength="400">${esc(n.aQuoiCaSert)}</textarea></label>
+        <div id="cor-msg"></div>
+        <div class="row-tags"><button class="cp" id="cor-ok" data-id="${n.id}">Enregistrer ma correction</button>${n.corrige ? `<button class="cp ghost" id="cor-non" data-id="${n.id}">Annuler ma correction</button>` : ""}</div>
+        <p>Votre correction est gardée quand vous mettez la carte à jour. La fiche continue d'afficher ce que l'outil a lu dans le dépôt.</p></div></details>`;
     }
     const fam = sel[0] === "f" || sel[0] === "s" ? COULEURS[parseInt(sel.slice(1)) % COULEURS.length] : null;
     el.style.setProperty("--fc", fam ? fam[0] : "#1b1f2a"); el.style.setProperty("--ft", fam ? fam[1] : "#f2f4f7");
@@ -196,6 +209,16 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         suivre(); render();
       } catch (e) { go.disabled = false; el.querySelector("#gh-msg").innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
     };
+    const maj = el.querySelector("#gh-maj");
+    if (maj) maj.onclick = mettreAJour;
+    const corriger = (bouton, corps) => async () => {
+      bouton.disabled = true;
+      try { projet = await api(`/projets/${projet.id}/cases/${bouton.dataset.id}`, corps()); arbre = projet.arbre; F = arbre.familles; render(); }
+      catch (e) { bouton.disabled = false; el.querySelector("#cor-msg").innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
+    };
+    const ok = el.querySelector("#cor-ok"), non = el.querySelector("#cor-non");
+    if (ok) ok.onclick = corriger(ok, () => ({ etat: el.querySelector("#cor-etat").value, titre: el.querySelector("#cor-titre").value, aQuoiCaSert: el.querySelector("#cor-sert").value }));
+    if (non) non.onclick = corriger(non, () => ({ annuler: true }));
     el.querySelectorAll("[data-go]").forEach((x) => (x.onclick = () => { sel = x.dataset.go; render(); center(sel); }));
   }
 
@@ -235,7 +258,13 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     b.className = "tg depot" + (l?.enCours ? " lit" : projet.depot?.sha ? " ok" : "");
     b.innerHTML = l?.enCours ? `<i class="lg w"></i><span>${esc(l.message)}</span>` : projet.depot?.sha ? `<span>Dépôt ${esc(projet.depot.nom)}</span>` : `<span>Connecter GitHub</span>`;
     b.setAttribute("aria-pressed", sel === "depot");
+    $("#maj").hidden = !projet.depot?.sha || !!l?.enCours;
   }
+  async function mettreAJour() {
+    try { projet = await api(`/projets/${projet.id}/lecture`, {}); } catch (e) { projet.lecture = { enCours: false, message: "", erreur: e.message }; }
+    ecartsOn = false; sel = "depot"; suivre(); render();
+  }
+  $("#maj").onclick = mettreAJour;
   $("#gh").onclick = () => { ecartsOn = false; sel = sel === "depot" ? null : "depot"; render(); };
   $("#dt").onclick = () => { ecartsOn = !ecartsOn; sel = ecartsOn ? "ecarts" : null; render(); };
   let minuterie = 0;
@@ -248,7 +277,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         const frais = await api(`/projets/${projet.id}`);
         const fini = !frais.lecture?.enCours;
         projet = frais; arbre = projet.arbre; F = arbre.familles;
-        if (fini && sel === "depot" && !frais.lecture?.erreur) sel = "root";
+        if (fini && sel === "depot" && !frais.lecture?.erreur && !frais.depot?.changements) sel = "root";
         render();
       } catch { /* on réessaie au tour suivant */ }
       suivre();
