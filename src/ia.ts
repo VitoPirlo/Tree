@@ -49,6 +49,8 @@ const SYSTEME_QUESTIONS = `${REGLES_COMMUNES}
 
 Les sujets qui changent l'arbre : le périmètre de cette version, les priorités, ce qui est explicitement hors périmètre, et qui porte quelle partie du produit (un associé, un prestataire, des agents IA). Si la description ne dit pas qui fait quoi, demande-le : l'arbre affiche un responsable par famille.
 
+Tes questions portent sur le produit à construire : ce qu'il doit faire, dans quel ordre, et qui le construit. Ne demande rien sur ses clients, son marché, son prix ou sa façon de se vendre, sauf si la réponse ajoute ou retire une partie du produit.
+
 Chaque question est courte, porte sur un seul sujet, et on peut y répondre en une ou deux phrases. Ne demande rien que la description dit déjà, et rien de technique. Pour chaque question, « pourquoi » dit en une phrase courte ce que la réponse change dans l'arbre.`;
 
 const SYSTEME_ARBRE = `${REGLES_COMMUNES}
