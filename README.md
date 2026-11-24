@@ -48,6 +48,20 @@ Ailleurs que sur Railway, le `Dockerfile` suffit : il faut donner les deux même
 
 À savoir avant d'ouvrir l'outil à quelqu'un d'autre : chaque personne crée son accès (adresse et mot de passe) et ne voit que ses projets. Le mot de passe `APP_PASSWORD` reste celui du propriétaire, qui récupère les projets déjà là. Après dix essais faux, il faut attendre un quart d'heure, et cette attente survit à un redémarrage. Les jetons GitHub sont rangés sur ce volume : un jeton qui peut aussi modifier le dépôt est refusé et n'est pas enregistré.
 
+## Formules et paiement
+
+Paiement unique, sans abonnement, en euros. Les seuils sont dans `src/packs.ts`. Rien n'est encaissé tant que Stripe n'est pas branché, et seule une clé de test (`sk_test_…`) est acceptée.
+
+Dans les variables du service :
+
+- `STRIPE_SECRET_KEY` : clé secrète de test.
+- `STRIPE_WEBHOOK_SECRET` : secret de signature du webhook. L'adresse à donner à Stripe est `https://votre-site/api/stripe`, événements `checkout.session.completed` et `charge.refunded`.
+- `TREE_BUDGET_JOUR_TOKENS` (facultatif) : plafond de jetons d'IA sur une journée. Au-delà, un message est écrit dans les journaux et, si `TREE_ALERTE_URL` est défini, un avis y est envoyé. Aucun texte de projet n'y figure.
+- `TREE_MODELE_QUESTIONS`, `TREE_MODELE_REPERAGE`, `TREE_MODELE_ARBRE`, `TREE_MODELE_JUGEMENT` (facultatifs) : modèle de chaque étape. Par défaut, les questions sont sur un modèle rapide, le repérage sur un modèle intermédiaire, le jugement et le dessin de l'arbre sur le modèle le plus précis.
+
+Dans Stripe, en mode test, activez l'e-mail de reçu pour un paiement réussi : c'est Stripe qui l'envoie. Le libellé du paiement est « Mycelium, pack [nom] (paiement unique, sans abonnement) ». Sur la page des formules, la case « Je veux accéder à Mycelium tout de suite, et je sais que je renonce ainsi à mon droit de rétractation de 14 jours. » est obligatoire, et décochée au départ. Tant que `STRIPE_SECRET_KEY` est absente, les boutons d'achat restent inactifs et la page dit « Le paiement n'est pas encore ouvert. »
+
+
 ## Vérifier
 
 ```bash

@@ -161,6 +161,46 @@ function ecranPreciser(projet) {
   };
 }
 
+async function ecranTarifs() {
+  const recu = await api("/formules");
+  const formules = recu.formules;
+  const ligne = (f) => {
+    const fichiers = Number(f.fichiersMax).toLocaleString("fr-FR");
+    if (f.id === "essentiel") return `${f.cartes} carte, ${f.redessins} redessins, ${f.lectures} lectures de ton dépôt, ${f.jours} jours, dépôt jusqu'à ${fichiers} fichiers.`;
+    if (f.id === "recharge") return "";
+    const cartes = `${f.cartes} carte${f.cartes > 1 ? "s" : ""}`;
+    return `${cartes}, ${f.redessins} redessins, ${f.lectures} lectures, ${f.mois} mois, jusqu'à ${fichiers} fichiers.`;
+  };
+  const accroche = {
+    essentiel: "Pour voir enfin où en est ton produit.",
+    suivi: "Pour garder un œil sur ton dev pendant des mois.",
+    studio: "Pour les gros projets, ou deux produits en parallèle.",
+    recharge: "Besoin de plus de lectures ? 5 de plus, et c'est reparti.",
+  };
+  page(`<p class="marque">${esc(etat.nom)}</p><h1>Un prix, une fois. Zéro abonnement.</h1>
+    <p class="sub">Tu paies, tu cartographies, tu suis ton dev. Pas de prélèvement surprise le mois d'après.</p>
+    ${formules.map((f) => `<article class="panel formule-carte"><h2>${esc(f.nom)}</h2><p><b>${esc(f.prix)}</b>${f.prixHabituel ? ` <s>${esc(f.prixHabituel)}</s>` : ""}${f.resteLancement != null ? ` <small>${f.resteLancement} places au prix de lancement</small>` : ""}</p><p>${esc(accroche[f.id] ?? f.resume)}</p>${ligne(f) ? `<p class="sub">${esc(ligne(f))}</p>` : ""}<button class="btn" type="button" data-pack="${esc(f.id)}" data-prix="${esc(f.prix)}"${recu.paiementOuvert ? "" : " disabled"}>Je prends ${esc(f.nom)}, ${esc(f.prix)}</button></article>`).join("")}
+    <label class="legal"><input type="checkbox" id="renonce"> ${esc(formules[0]?.renonciation ?? "")}</label>
+    ${recu.paiementOuvert ? "" : `<p class="note">Le paiement n'est pas encore ouvert.</p>`}
+    <div id="msg"></div>
+    <a class="btn ghost" href="#/" style="text-decoration:none">Retour</a>
+    <p class="legal">${esc(etat.confidentialite)}</p>`);
+  vue.querySelectorAll("[data-pack]").forEach((bouton) => (bouton.onclick = () => {
+    if (!vue.querySelector("#renonce").checked) { vue.querySelector("#msg").innerHTML = `<p class="err">Coche la case : tu dois demander l'accès tout de suite, et accepter de renoncer à la rétractation.</p>`; return; }
+    if (!etat.connecte) { location.hash = "#/entrer"; return; }
+    lancer(bouton, "Ouverture du paiement…", async () => {
+      const r = await api("/paiement", { pack: bouton.dataset.pack, renonciation: true });
+      if (r.url) location.href = r.url;
+    });
+  }));
+}
+
+function ecranMerci() {
+  page(`<p class="marque">${esc(etat.nom)}</p><h1>C'est payé !</h1>
+    <p>Ton reçu arrive par mail. Allez, on cartographie.</p>
+    <a class="btn" href="#/" style="text-decoration:none">Continuer</a>`);
+}
+
 function optionsCarte(id) {
   return {
     etat, api,
@@ -180,9 +220,13 @@ async function route() {
     if (!etat.connecte) {
       if (h === "#/entrer") return ecranConnexion();
       if (h === "#/inscription") return ecranInscription();
+      if (h === "#/tarifs") return ecranTarifs();
+      if (h === "#/merci") return ecranMerci();
       return montrerAccueil();
     }
     montrerApp();
+    if (h === "#/tarifs") return ecranTarifs();
+    if (h === "#/merci") return ecranMerci();
     if (h === "#/nouveau") return ecranDecrire();
     const m = /^#\/p\/([\w-]+)$/.exec(h);
     if (m) {

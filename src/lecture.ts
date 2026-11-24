@@ -39,7 +39,7 @@ export interface IALecture {
 export interface Cache { lire(cle: string): string | null; ecrire(cle: string, valeur: string): void }
 
 // Change quand les consignes données à l'IA changent, pour ne pas resservir d'anciennes réponses.
-const VERSION = "lecture-4";
+const VERSION = "lecture-5";
 const MAX_AJOUTS = 8;
 const cleTitre = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 const MAX_CHEMINS = 2500, MAX_TAILLE = 200_000, MAX_ENVOI = 30_000, MAX_DOC = 6000;
@@ -59,12 +59,29 @@ async function avecCache<T>(cache: Cache, cle: string, calcul: () => Promise<T>)
   return valeur;
 }
 
+const empreinteFusion = (f: { numero: number; etat: string; titre: string; date: string; branche: string }) =>
+  [f.numero, f.etat, f.titre, f.date, f.branche];
+
 /** Ce qui a changé entre deux lectures du dépôt, en phrases prêtes à afficher. */
 export interface Changements { depuis: string; lignes: string[] }
-export interface ResultatLecture { arbre: Arbre; depot: InfoDepot & { luLe: string; fichiersIgnores: number; changements?: Changements | null } }
+export interface ResultatLecture { arbre: Arbre; depot: InfoDepot & { luLe: string; fichiersIgnores: number; changements?: Changements | null }; appelsIa: number }
+
+export class ErreurTaille extends Error {
+  constructor(public fichiers: number, public maximum: number) {
+    super(`Ton dépôt est plus costaud que ton pack (${fichiers.toLocaleString("fr-FR")} fichiers, max ${maximum.toLocaleString("fr-FR")}). Passe au pack au-dessus pour qu'on le lise en entier.`);
+  }
+}
+
+export interface OptionsLecture {
+  /** Au-delà, on refuse avant tout appel à l'IA. */
+  fichiersMax?: number;
+  /** Appelé seulement si un appel IA est vraiment nécessaire (pas de cache). */
+  avantAppel?: (fichiers: number) => void;
+}
 
 export async function lireDepot(
   entree: { description: string; precisions?: string; arbre: Arbre }, depot: Depot, ia: IALecture, cache: Cache, progres: (message: string) => void = () => {},
+  options: OptionsLecture = {},
 ): Promise<ResultatLecture> {
   // L'IA lit la description et les réponses aux questions ; les citations, elles, ne se vérifient que dans la description.
   const pourIA = entree.description + (entree.precisions ? `\n\nPrécisions données ensuite par l'utilisateur :\n${entree.precisions}` : "");
@@ -72,6 +89,7 @@ export async function lireDepot(
   const info = await depot.info();
   const [tous, branches, fusions] = await Promise.all([depot.fichiers(info.sha), depot.branches(), depot.fusions()]);
   const lisibles = tous.filter((f) => !IGNORES.test(f.chemin) && !ILLISIBLES.test(f.chemin) && f.taille <= MAX_TAILLE);
+  if (options.fichiersMax != null && lisibles.length > options.fichiersMax) throw new ErreurTaille(lisibles.length, options.fichiersMax);
   const retenus = lisibles.slice(0, MAX_CHEMINS);
   const parChemin = new Map<string, Fichier>(retenus.map((f) => [f.chemin, f]));
 
@@ -114,8 +132,18 @@ export async function lireDepot(
   const formeArbre = entree.arbre.familles.map((f) => ({ titre: f.titre, themes: f.themes.map((t) => t.titre) }));
 
   progres("Repérage des endroits à lire pour chaque case…");
-  const empreinteDepot = hache([info.sha, branches, fusions.map((f) => [f.numero, f.etat, f.titre])]);
-  const plan = await avecCache(cache, `plan:${hache([VERSION, empreinteDepot, pourIA, toutesRefs, dejaTrouves])}`, () =>
+  // Pas l'empreinte du commit : un commit qui ne touche ni ces fichiers ni ces demandes
+  // ne doit pas relancer le repérage ni le jugement des familles inchangées.
+  let appelsIa = 0;
+  const depuisCache = async <T>(cle: string, calcul: () => Promise<T>): Promise<T> => {
+    if (cache.lire(cle)) return avecCache(cache, cle, calcul);
+    options.avantAppel?.(lisibles.length);
+    appelsIa++;
+    return avecCache(cache, cle, calcul);
+  };
+  const empreinteFichiers = retenus.map((f) => `${f.chemin}@${f.sha}`);
+  const empreinteFusions = fusions.map(empreinteFusion);
+  const plan = await depuisCache(`plan:${hache([VERSION, empreinteFichiers, branches, empreinteFusions, pourIA, toutesRefs, dejaTrouves])}`, () =>
     ia.planifier({ description: pourIA, familles: formeArbre, cases: toutesRefs, chemins: retenus.map((f) => f.chemin), docs, branches, fusions, dejaTrouves }));
   const pistes = new Map(plan.cases.map((p) => [p.ref, p]));
 
@@ -166,8 +194,8 @@ export async function lireDepot(
       await Promise.all(aLire.map(lire));
       const fichiers = aLire.map((chemin) => ({ chemin, texte: couper(contenus.get(chemin)!, MAX_ENVOI) }));
       const liees = numeros.map((x) => fusionsParNumero.get(x)!);
-      const cle = `jugement:${hache([VERSION, empreinteDepot, pourIA, famille.titre, famille.responsable, cases, aLire.map((c) => parChemin.get(c)!.sha)])}`;
-      const rendu = await avecCache(cache, cle, () =>
+      const cle = `jugement:${hache([VERSION, pourIA, famille.titre, famille.responsable, cases, aLire.map((c) => parChemin.get(c)!.sha), liees.map(empreinteFusion)])}`;
+      const rendu = await depuisCache(cle, () =>
         ia.juger({ commun, famille: famille.titre, responsable: famille.responsable ?? "", cases, fichiers, fusions: liees, branches, brancheDefaut: info.brancheDefaut }));
       verdicts = new Map(rendu.cases.map((v) => [v.ref, v]));
     }
@@ -184,7 +212,7 @@ export async function lireDepot(
     f.themes = f.themes.filter((t) => t.cases.length);
   }
 
-  return { arbre: entree.arbre, depot: { ...info, luLe: new Date().toISOString(), fichiersIgnores: lisibles.length - retenus.length } };
+  return { arbre: entree.arbre, depot: { ...info, luLe: new Date().toISOString(), fichiersIgnores: lisibles.length - retenus.length }, appelsIa };
 }
 
 const REPLI: Record<string, string> = {

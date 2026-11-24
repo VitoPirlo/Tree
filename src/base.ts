@@ -51,6 +51,17 @@ export function ouvrirBase(fichier?: string) {
   db.exec(`CREATE TABLE IF NOT EXISTS essais (cle TEXT PRIMARY KEY, n INTEGER NOT NULL, debut INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS mesures (cle TEXT PRIMARY KEY, n INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS invitations (code TEXT PRIMARY KEY, utilise_par TEXT)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS credits (
+    id TEXT PRIMARY KEY, utilisateur_id TEXT NOT NULL, pack TEXT NOT NULL,
+    cartes INTEGER NOT NULL, redessins INTEGER NOT NULL, lectures INTEGER NOT NULL,
+    fichiers_max INTEGER NOT NULL, expire_le TEXT NOT NULL,
+    session_stripe TEXT NOT NULL UNIQUE, paiement TEXT, remboursement INTEGER NOT NULL DEFAULT 0, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS journal_ia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, utilisateur_id TEXT NOT NULL, action TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+    cache_creation_input_tokens INTEGER NOT NULL, cache_read_input_tokens INTEGER NOT NULL,
+    fichiers INTEGER NOT NULL, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS alertes (jour TEXT PRIMARY KEY)`);
 
   const depotDe = (id: string): DepotConnecte | null => {
     const d: any = db.prepare("SELECT nom, info FROM depots WHERE projet_id = ?").get(id);
@@ -209,6 +220,66 @@ export function ouvrirBase(fichier?: string) {
         return c ? c.valeur : null;
       },
       ecrire(cle: string, valeur: string) { db.prepare("INSERT OR REPLACE INTO cache VALUES (?,?)").run(cle, valeur); },
+    },
+    journaliser(l: { utilisateurId: string; action: string; input_tokens: number; output_tokens: number; cache_creation_input_tokens: number; cache_read_input_tokens: number; fichiers: number }) {
+      db.prepare("INSERT INTO journal_ia (utilisateur_id, action, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, fichiers, cree_le) VALUES (?,?,?,?,?,?,?,?)")
+        .run(l.utilisateurId, l.action, l.input_tokens, l.output_tokens, l.cache_creation_input_tokens, l.cache_read_input_tokens, l.fichiers, new Date().toISOString());
+    },
+    /** Somme des jetons d'une journée UTC. Aucun texte. */
+    jetonsDuJour(debut: string, fin: string): number {
+      const r: any = db.prepare("SELECT COALESCE(SUM(input_tokens + output_tokens + cache_creation_input_tokens + cache_read_input_tokens), 0) AS n FROM journal_ia WHERE cree_le >= ? AND cree_le < ?").get(debut, fin);
+      return r.n;
+    },
+    /** Vrai seulement la première fois pour ce jour : une seule alerte. */
+    premiereAlerte(jour: string): boolean {
+      return db.prepare("INSERT INTO alertes (jour) VALUES (?) ON CONFLICT(jour) DO NOTHING").run(jour).changes === 1;
+    },
+    compterPack(pack: string): number {
+      const r: any = db.prepare("SELECT COUNT(*) AS n FROM credits WHERE pack = ? AND remboursement = 0").get(pack);
+      return r.n;
+    },
+    aDejaAchete(utilisateurId: string): boolean {
+      return !!db.prepare("SELECT 1 FROM credits WHERE utilisateur_id = ?").get(utilisateurId);
+    },
+    ajouterCredit(c: { utilisateurId: string; pack: string; cartes: number; redessins: number; lectures: number; fichiersMax: number; expireLe: string; sessionStripe: string; paiement: string | null }): boolean {
+      try {
+        db.prepare("INSERT INTO credits (id, utilisateur_id, pack, cartes, redessins, lectures, fichiers_max, expire_le, session_stripe, paiement, remboursement, cree_le) VALUES (?,?,?,?,?,?,?,?,?,?,0,?)")
+          .run(randomUUID(), c.utilisateurId, c.pack, c.cartes, c.redessins, c.lectures, c.fichiersMax, c.expireLe, c.sessionStripe, c.paiement, new Date().toISOString());
+        return true;
+      } catch { return false; }
+    },
+    echeanceActive(utilisateurId: string, maintenant: string): { expireLe: string; fichiersMax: number } | null {
+      const r: any = db.prepare("SELECT expire_le, fichiers_max FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ? ORDER BY expire_le DESC LIMIT 1").get(utilisateurId, maintenant);
+      return r ? { expireLe: r.expire_le, fichiersMax: r.fichiers_max } : null;
+    },
+    solde(utilisateurId: string, maintenant: string) {
+      const lignes = db.prepare("SELECT cartes, redessins, lectures, fichiers_max, expire_le FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ?").all(utilisateurId, maintenant) as any[];
+      const s = { cartes: 0, redessins: 0, lectures: 0, fichiersMax: 0, expireLe: null as string | null };
+      for (const l of lignes) {
+        s.cartes += l.cartes; s.redessins += l.redessins; s.lectures += l.lectures;
+        s.fichiersMax = Math.max(s.fichiersMax, l.fichiers_max);
+        if (!s.expireLe || l.expire_le > s.expireLe) s.expireLe = l.expire_le;
+      }
+      return s;
+    },
+    /** Retire une unité du lot qui expire le plus tôt et qui couvre la taille demandée. */
+    retrancher(utilisateurId: string, champ: "cartes" | "redessins" | "lectures", fichiers: number, maintenant: string): string | null {
+      const lignes = db.prepare(`SELECT id, fichiers_max FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ? AND ${champ} > 0 ORDER BY expire_le ASC`).all(utilisateurId, maintenant) as any[];
+      for (const l of lignes) {
+        if (champ === "lectures" && l.fichiers_max < fichiers) continue;
+        if (db.prepare(`UPDATE credits SET ${champ} = ${champ} - 1 WHERE id = ? AND ${champ} > 0`).run(l.id).changes === 1) return l.id;
+      }
+      return null;
+    },
+    rendre(id: string, champ: "cartes" | "redessins" | "lectures") {
+      db.prepare(`UPDATE credits SET ${champ} = ${champ} + 1 WHERE id = ?`).run(id);
+    },
+    retirerPaiement(paiement: string): boolean {
+      return db.prepare("UPDATE credits SET cartes = 0, redessins = 0, lectures = 0, remboursement = 1 WHERE paiement = ? AND remboursement = 0").run(paiement).changes > 0;
+    },
+    dernierCredit(utilisateurId: string): { expireLe: string; remboursement: boolean } | null {
+      const r: any = db.prepare("SELECT expire_le, remboursement FROM credits WHERE utilisateur_id = ? ORDER BY cree_le DESC LIMIT 1").get(utilisateurId);
+      return r ? { expireLe: r.expire_le, remboursement: !!r.remboursement } : null;
     },
   };
 }

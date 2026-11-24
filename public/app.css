@@ -67,6 +67,10 @@ a.chip{text-decoration:none;color:var(--ink)}
 .faq details{border:2px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
 .faq summary{cursor:pointer;font-weight:600}
 .faq p{margin:8px 0 0}
+.lien-discret{color:var(--muted);font-size:14px;align-self:center}
+.formule-carte{display:grid;gap:8px}
+.formule-carte h2{margin:0;font-size:20px}
+.formule-carte button:disabled{opacity:.45;cursor:not-allowed}
 .apercu{width:100%;background:var(--bg);border:2.5px solid var(--ink);border-radius:18px;padding:18px;display:flex;flex-wrap:wrap;gap:14px 18px;align-items:center}
 .ap-root{width:92px;height:92px;border-radius:50%;border:2.5px solid var(--ink);display:grid;place-items:center;text-align:center;font-family:var(--display);font-weight:700;font-size:14px;line-height:1.15;flex:none}
 .ap-col{display:grid;gap:8px;flex:1;min-width:140px}
@@ -79,7 +83,9 @@ a.chip{text-decoration:none;color:var(--ink)}
 .steps-l{list-style:none;margin:0;padding:0;display:grid;gap:12px}
 .steps-l li{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start;font-size:15px}
 .steps-l b{width:32px;height:32px;border:2px solid var(--ink);border-radius:50%;display:grid;place-items:center;font-family:var(--display)}
-.legal{font-size:13px;color:var(--muted);line-height:1.45}
+.formule{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-weight:500}
+.formule input{margin-top:4px}
+.formule s{color:var(--muted);font-weight:400}
 .list li{align-items:stretch}
 .suppr{border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:8px 10px;font-weight:600;box-shadow:0 3px 0 var(--line)}
 .suppr:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
