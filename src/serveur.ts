@@ -323,7 +323,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     gabarit ??= await readFile(path.join(PUBLIC, "index.html"), "utf8");
     const valeurs: Record<string, string> = { NOM: echap(NOM_PRODUIT), ORIGINE: echap(origine) };
     for (const [cle, valeur] of Object.entries(textesAccueil(plafond))) valeurs[cle] = echap(valeur);
-    return gabarit.replace(/\{\{([A-Z_]+)\}\}/g, (_, k: string) => valeurs[k] ?? "");
+    return gabarit.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k: string) => valeurs[k] ?? "");
   }
 
   return http.createServer(async (req, res) => {

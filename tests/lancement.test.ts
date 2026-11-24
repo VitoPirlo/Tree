@@ -49,6 +49,8 @@ test("page publique : le nom vient d'un seul endroit, avec l'aperçu du lien", a
     assert.ok(html.includes(PHRASE));
     assert.ok(html.includes("On lit. On n'écrit pas."));
     assert.ok(html.includes("Je me lance"));
+    assert.ok(html.includes("Fait, c'est dans le dépôt"));
+    assert.equal(html.includes("{{"), false);
     assert.equal(html.toLowerCase().includes("jeton"), false);
     const etatPublic = await (await fetch(url + "/api/etat")).json() as { confidentialite: string };
     assert.equal(etatPublic.confidentialite, CONFIDENTIALITE);
