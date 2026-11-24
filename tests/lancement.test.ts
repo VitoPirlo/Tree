@@ -46,7 +46,10 @@ test("page publique : le nom vient d'un seul endroit, avec l'aperçu du lien", a
     assert.equal(page.headers.get("x-frame-options"), "DENY");
     assert.match(page.headers.get("content-security-policy") ?? "", /script-src 'self'/);
     assert.match(html, new RegExp(`<title>${NOM_PRODUIT}</title>`));
-    assert.ok(html.includes(PHRASE));
+    const titre = /<h1>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "";
+    assert.equal(titre.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), PHRASE);
+    assert.match(titre, /<span>Vois où en est ton produit\.<\/span><span>Et ton dev\.<\/span>/);
+    assert.equal(PHRASE, "Vois où en est ton produit. Et ton dev.");
     assert.ok(html.includes("On lit. On n'écrit pas."));
     assert.ok(html.includes("Je me lance"));
     assert.ok(html.includes("Fait, c'est dans le dépôt"));

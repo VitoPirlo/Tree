@@ -54,11 +54,15 @@ a.chip{text-decoration:none;color:var(--ink)}
 .landing{max-width:880px;margin:0 auto;padding:36px 16px 72px;display:grid;gap:18px}
 .landing h1,.marque{font-family:var(--display);margin:0}
 .marque{font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-.landing h1{font-size:clamp(28px, 4vw, 42px);line-height:1.12;max-width:28ch}
+.landing h1{font-size:clamp(24px, 4.6vw, 42px);line-height:1.12}
+.landing h1 span{display:block;white-space:nowrap}
 .bloc{display:grid;gap:10px}
 .bloc h2{font-family:var(--display);font-size:22px;margin:8px 0 0}
 .bloc ul{margin:0;padding-left:1.2em;display:grid;gap:6px}
-.statut span{border:2px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--bg)}
+.landing .sub{color:#545c6a}
+@media (min-width:760px){.landing h1 + .sub{font-size:18px;line-height:1.45}}
+.statut{display:flex;flex-wrap:wrap;gap:8px}
+.statut span{white-space:nowrap;border:2px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--bg)}
 .faq{gap:8px}
 .faq details{border:2px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
 .faq summary{cursor:pointer;font-weight:600}
