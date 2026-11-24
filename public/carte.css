@@ -123,7 +123,9 @@ body.liste #layer{position:relative}
 body.liste .top{position:relative;top:auto;left:auto;right:auto;background:var(--bg);z-index:3;padding:8px 8px 0}
 body.liste .card{position:fixed;z-index:6;top:76px;right:14px;width:min(410px,calc(100% - 28px));max-height:calc(100vh - 96px)}
 @media (max-width:640px){
-  body.liste .card{top:auto;bottom:8px;left:8px;right:8px;width:auto;max-height:62vh}
+  body.liste .card{top:auto;bottom:12px;left:8px;right:8px;width:auto;max-height:62vh}
+  body.liste .chip, body.liste .tg{padding:4px 8px;font-size:12px}
+  body.liste .top{gap:6px}
 }
 body.liste .zoom, body.liste .hint{display:none}
 .liste-cases{padding:8px 16px 40px;display:grid;gap:16px;max-width:720px}
@@ -133,6 +135,7 @@ body.liste .zoom, body.liste .hint{display:none}
 .ligne{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-weight:600}
 .ligne[aria-pressed="true"]{border-color:var(--ink)}
 .ligne .tag{flex:none}
+.ligne .tag.pct{background:var(--ink);color:#fff}
 
 /* étape 4 : mise à jour et corrections à la main */
 .gp>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

@@ -24,18 +24,23 @@ function montrerAccueil() {
   document.body.className = "page";
   if (accueil) accueil.hidden = false;
   vue.hidden = true;
+  scrollTo(0, 0);
 }
 function montrerApp() {
   if (accueil) accueil.hidden = true;
   vue.hidden = false;
 }
-function page(html) { montrerApp(); document.body.className = "page"; vue.innerHTML = `<main>${html}</main>`; }
+function page(html) { montrerApp(); document.body.className = "page"; vue.innerHTML = `<main>${html}</main>`; scrollTo(0, 0); }
 
-/** Lance une action longue depuis un bouton : attente visible, erreur lisible. */
+/** Lance une action longue depuis un bouton : attente visible, erreur lisible. L'erreur reste à l'écran, elle n'est pas relancée. */
 function lancer(bouton, attente, action) {
   const zone = vue.querySelector("#msg"), texte = bouton.textContent;
-  bouton.disabled = true; zone.innerHTML = `<p class="wait">${attente}</p>`;
-  return Promise.resolve(action()).catch((e) => { zone.innerHTML = e.message ? `<p class="err">${esc(e.message)}</p>` : ""; bouton.disabled = false; bouton.textContent = texte; throw e; });
+  bouton.disabled = true; if (zone) zone.innerHTML = `<p class="wait">${attente}</p>`;
+  return Promise.resolve(action()).then(() => true, (e) => {
+    if (zone) zone.innerHTML = e.message ? `<p class="err">${esc(e.message)}</p>` : "";
+    bouton.disabled = false; bouton.textContent = texte;
+    return false;
+  });
 }
 
 async function sortir() {
@@ -133,7 +138,7 @@ function ecranDecrire() {
     lancer(bouton, "Le premier arbre se dessine… Cela prend environ une minute. Vous pourrez l'ajuster ensuite.", async () => {
       const p = await api("/projets", { description: vue.querySelector("#desc").value });
       location.hash = "#/p/" + p.id;
-    }).catch(() => { dessin = false; });
+    }).then((ok) => { if (!ok) dessin = false; });
   };
 }
 

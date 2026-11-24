@@ -121,7 +121,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
   /* Liste plate : même cases, sans le plateau à faire glisser. */
   function buildListe() {
     const g = stat(F.flatMap(toutes));
-    let html = `<div class="liste-cases"><button class="ligne" data-k="root" aria-pressed="${sel === "root"}"><span class="tag">${Math.round(part(g.done, g.tot))} %</span><span>${esc(arbre.produit.nom)}</span></button>`;
+    let html = `<div class="liste-cases"><button class="ligne" data-k="root" aria-pressed="${sel === "root"}"><span class="tag pct">${Math.round(part(g.done, g.tot))} %</span><span>${esc(arbre.produit.nom)}</span></button>`;
     F.forEach((f, fi) => {
       html += `<section><h2>${esc(f.titre)}</h2>`;
       f.themes.forEach((t, gi) => {
@@ -357,4 +357,5 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
   if (!vueListe && !projet.depot && (projet.questions ?? []).some((_, i) => !projet.reponses?.[i]?.trim())) sel = "affiner";
   suivre();
   render(); fit(false);
+  scrollTo(0, 0);
 }
