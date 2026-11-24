@@ -44,22 +44,27 @@ function listePreuves(n) {
   return `<details class="ev"><summary>Où regarder dans le dépôt (${n.preuves.length} preuve${n.preuves.length > 1 ? "s" : ""} vérifiée${n.preuves.length > 1 ? "s" : ""})</summary><ul style="margin-top:6px">${li}</ul></details>`;
 }
 
-export function monterCarte(racine, projet, { modeDemo, api }) {
+export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
+  const nom = etat?.nom || "";
   let arbre = projet.arbre, F = arbre.familles;
+  let vueListe = matchMedia("(max-width: 640px)").matches;
+  const titreMarque = !nom || arbre.produit.nom.toLowerCase() === nom.toLowerCase() ? esc(arbre.produit.nom) : `${esc(nom)} · ${esc(arbre.produit.nom)}`;
   document.body.className = "";
+  racine.hidden = false;
   racine.innerHTML = `
-    <div id="board" aria-label="Arbre du produit ${esc(arbre.produit.nom)}"><div id="layer"></div></div>
     <div class="top">
       <div class="hud">
         <a class="chip" href="#/" aria-label="Retour aux projets">←</a>
-        <div class="chip"><h1>${/^carte produit/i.test(arbre.produit.nom) ? "" : "Carte produit "}${esc(arbre.produit.nom)}</h1></div>
+        <button class="chip" id="sortir" type="button">Sortir</button>
+        <div class="chip"><h1>${titreMarque}</h1></div>
         <div class="chip k"><i class="lg"></i><b id="c1"></b> débloqués</div>
         <div class="chip k"><i class="lg w"></i><b id="c2"></b> en cours</div>
         <div class="chip k"><i class="lg t"></i><b id="c3"></b> à débloquer</div>
         ${projet.demo ? '<div class="chip demo">Exemple de démonstration</div>' : ""}
       </div>
-      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="aff"></button><button class="tg depot" id="maj" hidden>Mettre à jour</button><button class="tg depot" id="gh"></button></div>
+      <div class="hud"><button class="tg" id="dt" aria-pressed="false" hidden><i>!</i><span id="dtl"></span></button><button class="tg depot" id="mode" type="button">Voir la liste</button><button class="tg depot" id="aff"></button><button class="tg depot" id="maj" hidden>Mettre à jour</button><button class="tg depot" id="gh"></button></div>
     </div>
+    <div id="board" aria-label="Arbre du produit ${esc(arbre.produit.nom)}"><div id="layer"></div></div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
     </div>
@@ -113,6 +118,30 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     $("#c1").textContent = g.done; $("#c2").textContent = g.wip; $("#c3").textContent = g.todo;
   }
 
+  /* Liste plate : même cases, sans le plateau à faire glisser. */
+  function buildListe() {
+    const g = stat(F.flatMap(toutes));
+    let html = `<div class="liste-cases"><button class="ligne" data-k="root" aria-pressed="${sel === "root"}"><span class="tag">${Math.round(part(g.done, g.tot))} %</span><span>${esc(arbre.produit.nom)}</span></button>`;
+    F.forEach((f, fi) => {
+      html += `<section><h2>${esc(f.titre)}</h2>`;
+      f.themes.forEach((t, gi) => {
+        html += `<h3>${esc(t.titre)}</h3><ul>`;
+        t.cases.forEach((n, i) => {
+          const key = `s${fi}-${gi}-${i}`;
+          html += `<li><button class="ligne" data-k="${key}" aria-pressed="${sel === key}" aria-label="${esc(n.titre)} : ${LABEL[n.etat]}"><span class="tag ${n.etat}">${LABEL[n.etat]}</span><span>${esc(n.titre)}</span></button></li>`;
+        });
+        html += `</ul>`;
+      });
+      html += `</section>`;
+    });
+    html += `</div>`;
+    layer.style.width = "auto"; layer.style.height = "auto";
+    layer.innerHTML = html;
+    $("#dt").hidden = !g.ecarts; $("#dtl").textContent = `${g.ecarts} écart${g.ecarts > 1 ? "s" : ""} avec la description`;
+    $("#dt").setAttribute("aria-pressed", ecartsOn);
+    $("#c1").textContent = g.done; $("#c2").textContent = g.wip; $("#c3").textContent = g.todo;
+  }
+
   /* fiche */
   function card() {
     const el = $("#card");
@@ -125,7 +154,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         <p class="ev">${g.done} cases débloquées, ${g.wip} en cours, ${g.todo} à débloquer, ${g.later} prévues après cette version.</p>
         ${projet.depot?.sha
           ? `<p class="ev">Carte établie à partir de votre description et du dépôt ${esc(projet.depot.nom)} (branche ${esc(projet.depot.brancheDefaut)} au ${dateFr(projet.depot.dateDernierCommit)}), lu le ${dateFr(projet.depot.luLe)}. « Débloqué » veut dire construit et testé, pas encore éprouvé en production. Les cases à débloquer sont des propositions de l'outil, déduites de votre description.</p>${projet.depot.fichiersIgnores ? `<p class="ev">Dépôt très volumineux : ${projet.depot.fichiersIgnores} fichiers n'ont pas été pris en compte.</p>` : ""}`
-          : `<p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}`;
+          : `<p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}
+        ${supprimer ? `<div class="tech"><button class="cp" id="suppr" type="button">Supprimer ce projet</button></div>` : ""}`;
     } else if (sel === "ecarts") {
       h += `<span class="ey">Ce qui existe ne correspond pas à ce que vous avez écrit</span><h2>Écarts avec la description</h2><ul>`;
       F.forEach((f, fi) => f.themes.forEach((t, gi) => t.cases.forEach((n, ni) => { if (n.ecart) h += `<li><button data-go="s${fi}-${gi}-${ni}"><span>${esc(f.titre)} · <b>${esc(n.titre)}</b><br><span class="ev">${esc(n.ecart.constat)}</span></span></button></li>`; })));
@@ -154,6 +184,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       else h += `<h2>Connecter votre dépôt</h2>${l?.erreur ? `<p class="dr"><b>Lecture interrompue.</b> ${esc(l.erreur)}</p>` : ""}
         ${projet.demo ? '<p>En mode démonstration, l\'outil lit un dépôt d\'exemple fourni avec lui.</p>' : `
         <p>L'outil lit votre dépôt pour vérifier, case par case, ce qui est réellement construit. Il ne peut rien y modifier.</p>
+        <p><b>Un jeton qui peut modifier le dépôt est refusé</b>, et il n'est pas enregistré. Laissez le champ vide seulement pour un dépôt public.</p>
+        <p class="ev">${esc(etat?.confidentialite || "")}</p>
         <label>Dépôt<input id="gh-depot" placeholder="proprietaire/nom" value="${esc(d?.nom ?? "")}" autocomplete="off"></label>
         <label>Jeton en lecture seule<input id="gh-jeton" type="password" autocomplete="off"><small>Laissez vide pour un dépôt public.</small></label>
         <details class="ev"><summary>Comment créer ce jeton</summary><p style="margin-top:6px">Sur GitHub : Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token. Choisissez « Only select repositories » et votre dépôt, puis dans « Repository permissions » mettez <b>Contents</b> et <b>Pull requests</b> sur « Read-only ». Rien d'autre.</p></details>`}
@@ -188,7 +220,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
         if (n.horsCode) h += `<p class="ev">Ce n'est pas du code à écrire : c'est une démarche ou une décision.</p>`;
         if (n.decision) h += `<div class="tech"><span class="lb">Décision à prendre avant</span><p>${esc(n.decision)}</p></div>`;
         if (n.taches?.length) h += `<div class="tech"><span class="lb">Qui doit faire quoi${n.prompt ? " avant" : ""}</span>${qui(n.taches)}</div>`;
-        if (n.prompt) h += `<div class="tech"><span class="lb">Prompt pour le réaliser, aligné sur le dépôt</span><pre id="pr">${esc(n.prompt)}</pre><button class="cp" id="cp">Copier le prompt</button><p class="ev" style="margin-top:8px">À coller dans votre propre outil de développement. Carte produit ne lance rien lui-même.</p></div>`;
+        if (n.prompt) h += `<div class="tech"><span class="lb">Prompt pour le réaliser, aligné sur le dépôt</span><pre id="pr">${esc(n.prompt)}</pre><button class="cp" id="cp">Copier le prompt</button><p class="ev" style="margin-top:8px">À coller dans votre propre outil de développement. ${esc(nom)} ne lance rien lui-même.</p></div>`;
         if (!n.nonVerifie && n.origine !== "depot") h += `<p class="ev">Proposition de l'outil, déduite de votre description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>`;
       }
       if (n.origine === "depot") h += `<p class="ev">Trouvé dans le dépôt : cette case ne vient pas de votre description.</p>`;
@@ -237,6 +269,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       try { projet = await api(`/projets/${projet.id}/cases/${bouton.dataset.id}`, corps()); arbre = projet.arbre; F = arbre.familles; render(); }
       catch (e) { bouton.disabled = false; el.querySelector("#cor-msg").innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
     };
+    const suppr = el.querySelector("#suppr");
+    if (suppr && supprimer) suppr.onclick = () => supprimer();
     const ok = el.querySelector("#cor-ok"), non = el.querySelector("#cor-non");
     if (ok) ok.onclick = corriger(ok, () => ({ etat: el.querySelector("#cor-etat").value, titre: el.querySelector("#cor-titre").value, aQuoiCaSert: el.querySelector("#cor-sert").value }));
     if (non) non.onclick = corriger(non, () => ({ annuler: true }));
@@ -247,6 +281,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
   let s = 1, tx = 0, ty = 0;
   const apply = () => { layer.style.transform = `translate(${tx}px,${ty}px) scale(${s})`; };
   function fit(whole) {
+    if (vueListe) { s = 1; tx = 0; ty = 0; apply(); return; }
     const bw = board.clientWidth, bh = board.clientHeight;
     const fw = Math.min(bw / (W + 16), 1), fa = Math.min(fw, (bh - 130) / H);
     s = whole ? fa : Math.max(fw, 0.6);
@@ -259,7 +294,7 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     tx = board.clientWidth * 0.4 - x * s; ty = board.clientHeight * 0.45 - y * s; apply();
   }
   const pts = new Map(); let moved = 0, pinch = 0;
-  board.addEventListener("pointerdown", (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; if (pts.size === 2) { const v = [...pts.values()]; pinch = Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]); } });
+  board.addEventListener("pointerdown", (e) => { if (vueListe) return; pts.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; if (pts.size === 2) { const v = [...pts.values()]; pinch = Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]); } });
   board.addEventListener("pointermove", (e) => {
     if (!pts.has(e.pointerId)) return; const p = pts.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1];
     pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -268,8 +303,8 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
   });
   const up = (e) => { pts.delete(e.pointerId); board.classList.remove("drag"); if (pts.size < 2) pinch = 0; };
   board.addEventListener("pointerup", up); board.addEventListener("pointercancel", up); board.addEventListener("pointerleave", up);
-  board.addEventListener("wheel", (e) => { e.preventDefault(); if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY); else { tx -= e.deltaX; ty -= e.deltaY; apply(); } }, { passive: false });
-  layer.addEventListener("click", (e) => { const b = e.target.closest("button.nd"); if (!b || moved > 5) return; sel = sel === b.dataset.k ? null : b.dataset.k; render(); });
+  board.addEventListener("wheel", (e) => { if (vueListe) return; e.preventDefault(); if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY); else { tx -= e.deltaX; ty -= e.deltaY; apply(); } }, { passive: false });
+  layer.addEventListener("click", (e) => { const b = e.target.closest("[data-k]"); if (!b || moved > 5) return; sel = sel === b.dataset.k ? null : b.dataset.k; render(); });
   $("#zi").onclick = () => zoomAt(1.2, board.clientWidth / 2, board.clientHeight / 2);
   $("#zo").onclick = () => zoomAt(1 / 1.2, board.clientWidth / 2, board.clientHeight / 2);
   $("#zf").onclick = () => fit(true);
@@ -280,6 +315,9 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
     b.innerHTML = l?.enCours ? `<i class="lg w"></i><span>${esc(l.message)}</span>` : projet.depot?.sha ? `<span>Dépôt ${esc(projet.depot.nom)}</span>` : `<span>Connecter GitHub</span>`;
     b.setAttribute("aria-pressed", sel === "depot");
     $("#maj").hidden = !projet.depot?.sha || !!l?.enCours;
+    const mode = $("#mode");
+    mode.textContent = vueListe ? "Voir la carte" : "Voir la liste";
+    mode.setAttribute("aria-pressed", String(vueListe));
     const reste = (projet.questions ?? []).filter((_, i) => !projet.reponses?.[i]?.trim()).length;
     $("#aff").innerHTML = `<span>Ajuster l'arbre</span>${reste ? `<i>${reste}</i>` : ""}`;
     $("#aff").hidden = !!l?.enCours; $("#aff").setAttribute("aria-pressed", sel === "affiner");
@@ -308,9 +346,15 @@ export function monterCarte(racine, projet, { modeDemo, api }) {
       suivre();
     }, 1500);
   }
-  function render() { build(); card(); bouton(); }
+  function render() {
+    document.body.className = vueListe ? "liste" : "";
+    if (vueListe) buildListe(); else build();
+    card(); bouton();
+  }
+  $("#mode").onclick = () => { vueListe = !vueListe; render(); if (!vueListe) fit(false); };
+  $("#sortir").onclick = () => sortir?.();
   // À l'arrivée sur un arbre tout neuf, les questions sont ouvertes à côté.
-  if (!projet.depot && (projet.questions ?? []).some((_, i) => !projet.reponses?.[i]?.trim())) sel = "affiner";
+  if (!vueListe && !projet.depot && (projet.questions ?? []).some((_, i) => !projet.reponses?.[i]?.trim())) sel = "affiner";
   suivre();
   render(); fit(false);
 }

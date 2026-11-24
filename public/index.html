@@ -3,14 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Carte produit</title>
+<title>{{NOM}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{NOM}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:image" content="{{ORIGINE}}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{IMAGE_ALT}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{NOM}}">
+<meta name="twitter:description" content="{{DESCRIPTION}}">
+<meta name="twitter:image" content="{{ORIGINE}}/og.png">
+<meta name="twitter:image:alt" content="{{IMAGE_ALT}}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/carte.css">
 <link rel="stylesheet" href="/app.css">
 </head>
-<body>
-<div id="vue"></div>
+<body class="page">
+<main id="accueil" class="landing">
+  <p class="marque">{{NOM}}</p>
+  <h1>{{PHRASE}}</h1>
+  <div class="row">
+    <a class="btn" href="#/inscription">Créer un accès</a>
+    <a class="btn ghost" href="#/entrer">J'ai déjà un accès</a>
+  </div>
+  <div class="apercu" role="img" aria-label="{{IMAGE_ALT}}">
+    <div class="ap-root">Votre<br>produit</div>
+    <div class="ap-col">
+      <p class="ap-fam bleu">Parcours client</p>
+      <p class="ap-fam violet">Côté atelier</p>
+      <p class="ap-fam orange">Confiance</p>
+    </div>
+    <div class="ap-col">
+      <p class="ap-case bleu">Réserver en une minute <small>Débloqué</small></p>
+      <p class="ap-case bleu">Valider le devis</p>
+      <p class="ap-case violet">Voir la semaine <small>En cours</small></p>
+      <p class="ap-case gris">Prévenir par SMS <small>À débloquer</small></p>
+      <p class="ap-case orange">Chaque atelier, ses clients</p>
+    </div>
+  </div>
+  <ol class="steps-l">
+    <li><b>1</b><span><strong>Décrivez le produit.</strong> Avec vos mots, ou avec un texte préparé par l'IA qui connaît déjà le projet.</span></li>
+    <li><b>2</b><span><strong>L'arbre se dessine.</strong> Les grands chantiers, les sujets, et ce qui est fait, en cours ou encore à faire.</span></li>
+    <li><b>3</b><span><strong>Reliez GitHub, en lecture seule.</strong> Chaque case est vérifiée dans le dépôt. Un jeton qui pourrait le modifier est refusé.</span></li>
+  </ol>
+  <p class="note">L'essai comprend {{PLAFOND}} actions. Dessiner un arbre, l'ajuster ou lire le dépôt en utilise une.</p>
+  <p class="legal">{{CONFIDENTIALITE}}</p>
+</main>
+<div id="vue" hidden></div>
 <script type="module" src="/app.js"></script>
 </body>
 </html>
