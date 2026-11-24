@@ -1,7 +1,8 @@
-// Stockage : un simple fichier SQLite. Suffisant pour un seul utilisateur.
+// Stockage : un fichier SQLite. Chaque accès ne voit que ses projets.
+// Le fichier s'appelle encore carte-produit.sqlite : les données déjà en ligne restent au même endroit.
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Arbre, Question } from "./arbre.ts";
 import type { ResultatLecture } from "./lecture.ts";
@@ -17,6 +18,19 @@ export interface Projet {
   depot: DepotConnecte | null;
 }
 
+export interface Utilisateur {
+  id: string;
+  email: string;
+  nom: string;
+  /** Vrai pour le compte qui récupère les projets d'avant les accès séparés, et qui voit les compteurs. */
+  proprietaire: boolean;
+  actions: number;
+  /** Présent seulement pour un accès inscrit. Le propriétaire se connecte avec APP_PASSWORD, non stocké. */
+  hash: string | null;
+}
+
+export type Mesure = "visite" | "arbre" | "depot";
+
 export function ouvrirBase(fichier?: string) {
   const dossier = process.env.DATA_DIR ?? "data";
   if (!fichier) { mkdirSync(dossier, { recursive: true }); fichier = path.join(dossier, "carte-produit.sqlite"); }
@@ -25,10 +39,29 @@ export function ouvrirBase(fichier?: string) {
     id TEXT PRIMARY KEY, nom TEXT NOT NULL, description TEXT NOT NULL, etape TEXT NOT NULL,
     questions TEXT NOT NULL, reponses TEXT NOT NULL, arbre TEXT, demo INTEGER NOT NULL, cree_le TEXT NOT NULL)`);
 
-  // Colonne ajoutée après coup : les bases déjà en service ne l'ont pas.
+  // Colonnes ajoutées après coup : les bases déjà en service ne les ont pas.
   try { db.exec("ALTER TABLE projets ADD COLUMN remarques TEXT"); } catch { /* elle existe déjà */ }
+  try { db.exec("ALTER TABLE projets ADD COLUMN utilisateur_id TEXT"); } catch { /* elle existe déjà */ }
   db.exec(`CREATE TABLE IF NOT EXISTS depots (projet_id TEXT PRIMARY KEY, nom TEXT NOT NULL, jeton TEXT NOT NULL, info TEXT)`);
   db.exec(`CREATE TABLE IF NOT EXISTS cache (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS utilisateurs (
+    id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, nom TEXT NOT NULL, hash TEXT,
+    proprietaire INTEGER NOT NULL, actions_ia INTEGER NOT NULL DEFAULT 0, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, utilisateur_id TEXT NOT NULL, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS essais (cle TEXT PRIMARY KEY, n INTEGER NOT NULL, debut INTEGER NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS mesures (cle TEXT PRIMARY KEY, n INTEGER NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS invitations (code TEXT PRIMARY KEY, utilise_par TEXT)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS credits (
+    id TEXT PRIMARY KEY, utilisateur_id TEXT NOT NULL, pack TEXT NOT NULL,
+    cartes INTEGER NOT NULL, redessins INTEGER NOT NULL, lectures INTEGER NOT NULL,
+    fichiers_max INTEGER NOT NULL, expire_le TEXT NOT NULL,
+    session_stripe TEXT NOT NULL UNIQUE, paiement TEXT, remboursement INTEGER NOT NULL DEFAULT 0, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS journal_ia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, utilisateur_id TEXT NOT NULL, action TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+    cache_creation_input_tokens INTEGER NOT NULL, cache_read_input_tokens INTEGER NOT NULL,
+    fichiers INTEGER NOT NULL, cree_le TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS alertes (jour TEXT PRIMARY KEY)`);
 
   const depotDe = (id: string): DepotConnecte | null => {
     const d: any = db.prepare("SELECT nom, info FROM depots WHERE projet_id = ?").get(id);
@@ -40,26 +73,127 @@ export function ouvrirBase(fichier?: string) {
     questions: JSON.parse(r.questions), reponses: JSON.parse(r.reponses), remarques: r.remarques ? JSON.parse(r.remarques) : [],
     arbre: r.arbre ? JSON.parse(r.arbre) : null, demo: !!r.demo, creeLe: r.cree_le,
   });
+  const utilisateur = (r: any): Utilisateur => ({
+    id: r.id, email: r.email, nom: r.nom, proprietaire: !!r.proprietaire, actions: r.actions_ia, hash: r.hash ?? null,
+  });
+  const hashJeton = (brut: string) => createHash("sha256").update(brut).digest("hex");
 
   return {
-    lister(): Projet[] {
-      return db.prepare("SELECT * FROM projets ORDER BY cree_le DESC").all().map(lire);
+    fermer() { db.close(); },
+    assurerProprietaire(email: string): Utilisateur {
+      const existe = db.prepare("SELECT id FROM utilisateurs WHERE id = 'proprietaire'").get();
+      if (!existe) {
+        db.prepare("INSERT INTO utilisateurs VALUES (?,?,?,?,?,?,?)").run("proprietaire", email, "Propriétaire", null, 1, 0, new Date().toISOString());
+      } else {
+        try { db.prepare("UPDATE utilisateurs SET email = ?, proprietaire = 1 WHERE id = 'proprietaire'").run(email); } catch { /* adresse déjà prise : on garde l'ancienne */ }
+      }
+      return this.trouverUtilisateur("proprietaire")!;
     },
-    trouver(id: string): Projet | null {
-      const r = db.prepare("SELECT * FROM projets WHERE id = ?").get(id);
+    assurerLocal(): Utilisateur {
+      if (!db.prepare("SELECT id FROM utilisateurs WHERE id = 'local'").get()) {
+        db.prepare("INSERT INTO utilisateurs VALUES (?,?,?,?,?,?,?)").run("local", "local@localhost", "Cet ordinateur", null, 1, 0, new Date().toISOString());
+      }
+      return this.trouverUtilisateur("local")!;
+    },
+    /** Projets d'avant les accès séparés : ils n'avaient pas de propriétaire. */
+    rattacherOrphelins(utilisateurId: string) {
+      db.prepare("UPDATE projets SET utilisateur_id = ? WHERE utilisateur_id IS NULL").run(utilisateurId);
+    },
+    /** Déplace les projets d'un accès vers un autre (le mode local, une fois le mot de passe posé). */
+    rattacherCompte(depuis: string, vers: string) {
+      db.prepare("UPDATE projets SET utilisateur_id = ? WHERE utilisateur_id = ?").run(vers, depuis);
+    },
+    trouverUtilisateur(id: string): Utilisateur | null {
+      const r = db.prepare("SELECT * FROM utilisateurs WHERE id = ?").get(id);
+      return r ? utilisateur(r) : null;
+    },
+    trouverParEmail(email: string): Utilisateur | null {
+      const r = db.prepare("SELECT * FROM utilisateurs WHERE email = ?").get(email);
+      return r ? utilisateur(r) : null;
+    },
+    inscrire(email: string, nom: string, hash: string): Utilisateur {
+      const id = randomUUID().slice(0, 12);
+      db.prepare("INSERT INTO utilisateurs VALUES (?,?,?,?,?,?,?)").run(id, email, nom, hash, 0, 0, new Date().toISOString());
+      return this.trouverUtilisateur(id)!;
+    },
+    ouvrirSession(utilisateurId: string): string {
+      const brut = randomBytes(32).toString("hex");
+      db.prepare("INSERT INTO sessions VALUES (?,?,?)").run(hashJeton(brut), utilisateurId, new Date().toISOString());
+      return brut;
+    },
+    fermerSession(brut: string) {
+      if (!/^[0-9a-f]{64}$/.test(brut)) return;
+      db.prepare("DELETE FROM sessions WHERE hash = ?").run(hashJeton(brut));
+    },
+    session(brut: string): Utilisateur | null {
+      if (!/^[0-9a-f]{64}$/.test(brut)) return null;
+      const r = db.prepare("SELECT u.* FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id WHERE s.hash = ?").get(hashJeton(brut));
+      return r ? utilisateur(r) : null;
+    },
+    /** Réserve une action d'essai. Faux si le plafond est déjà atteint. Atomique. */
+    reserverAction(id: string, plafond: number): boolean {
+      return db.prepare("UPDATE utilisateurs SET actions_ia = actions_ia + 1 WHERE id = ? AND actions_ia < ?").run(id, plafond).changes === 1;
+    },
+    rendreAction(id: string) {
+      db.prepare("UPDATE utilisateurs SET actions_ia = MAX(actions_ia - 1, 0) WHERE id = ?").run(id);
+    },
+    bloque(cle: string, maintenant: number, fenetre: number, max: number): boolean {
+      const e: any = db.prepare("SELECT n, debut FROM essais WHERE cle = ?").get(cle);
+      if (!e) return false;
+      if (maintenant - e.debut > fenetre) { db.prepare("DELETE FROM essais WHERE cle = ?").run(cle); return false; }
+      return e.n >= max;
+    },
+    noterEchec(cle: string, maintenant: number, fenetre: number) {
+      const e: any = db.prepare("SELECT n, debut FROM essais WHERE cle = ?").get(cle);
+      if (!e || maintenant - e.debut > fenetre) {
+        db.prepare("INSERT INTO essais (cle, n, debut) VALUES (?,?,?) ON CONFLICT(cle) DO UPDATE SET n = 1, debut = excluded.debut").run(cle, 1, maintenant);
+        return;
+      }
+      db.prepare("UPDATE essais SET n = n + 1 WHERE cle = ?").run(cle);
+    },
+    reinitialiserEchecs(cle: string) {
+      db.prepare("DELETE FROM essais WHERE cle = ?").run(cle);
+    },
+    chargerCodes(codes: string[]) {
+      for (const code of codes) db.prepare("INSERT OR IGNORE INTO invitations (code) VALUES (?)").run(code);
+    },
+    /** Pose une réservation vide sur le code. Faux s'il est inconnu ou déjà pris. */
+    reserverCode(code: string): boolean {
+      return db.prepare("UPDATE invitations SET utilise_par = '' WHERE code = ? AND utilise_par IS NULL").run(code).changes === 1;
+    },
+    confirmerCode(code: string, utilisateurId: string) {
+      db.prepare("UPDATE invitations SET utilise_par = ? WHERE code = ?").run(utilisateurId, code);
+    },
+    libererCode(code: string) {
+      db.prepare("UPDATE invitations SET utilise_par = NULL WHERE code = ? AND utilise_par = ''").run(code);
+    },
+    mesure(cle: Mesure) {
+      db.prepare("INSERT INTO mesures (cle, n) VALUES (?, 1) ON CONFLICT(cle) DO UPDATE SET n = n + 1").run(cle);
+    },
+    mesures(): Record<Mesure, number> {
+      const m: Record<Mesure, number> = { visite: 0, arbre: 0, depot: 0 };
+      for (const l of db.prepare("SELECT cle, n FROM mesures").all() as any[]) if (l.cle in m) m[l.cle as Mesure] = l.n;
+      return m;
+    },
+    lister(utilisateurId: string): Projet[] {
+      return db.prepare("SELECT * FROM projets WHERE utilisateur_id = ? ORDER BY cree_le DESC").all(utilisateurId).map(lire);
+    },
+    trouver(id: string, utilisateurId: string): Projet | null {
+      const r = db.prepare("SELECT * FROM projets WHERE id = ? AND utilisateur_id = ?").get(id, utilisateurId);
       return r ? lire(r) : null;
     },
-    creer(description: string, questions: Question[], demo: boolean): Projet {
+    creer(utilisateurId: string, description: string, questions: Question[], demo: boolean): Projet {
       const p: Projet = { id: randomUUID().slice(0, 12), nom: "Nouveau projet", description, etape: "questions", questions, reponses: [], remarques: [], arbre: null, demo, creeLe: new Date().toISOString(), depot: null };
-      db.prepare("INSERT INTO projets (id, nom, description, etape, questions, reponses, arbre, demo, cree_le) VALUES (?,?,?,?,?,?,?,?,?)").run(p.id, p.nom, p.description, p.etape, JSON.stringify(questions), "[]", null, demo ? 1 : 0, p.creeLe);
+      db.prepare("INSERT INTO projets (id, nom, description, etape, questions, reponses, arbre, demo, cree_le, utilisateur_id) VALUES (?,?,?,?,?,?,?,?,?,?)").run(p.id, p.nom, p.description, p.etape, JSON.stringify(questions), "[]", null, demo ? 1 : 0, p.creeLe, utilisateurId);
       return p;
     },
     enregistrerArbre(id: string, reponses: string[], arbre: Arbre) {
       db.prepare("UPDATE projets SET etape='arbre', nom=?, reponses=?, arbre=? WHERE id=?").run(arbre.produit.nom, JSON.stringify(reponses), JSON.stringify(arbre), id);
     },
-    supprimer(id: string) {
-      db.prepare("DELETE FROM projets WHERE id = ?").run(id);
-      db.prepare("DELETE FROM depots WHERE projet_id = ?").run(id);
+    supprimer(id: string, utilisateurId: string) {
+      const r = db.prepare("DELETE FROM projets WHERE id = ? AND utilisateur_id = ?").run(id, utilisateurId);
+      if (r.changes) db.prepare("DELETE FROM depots WHERE projet_id = ?").run(id);
+      return r.changes === 1;
     },
     connecterDepot(id: string, nom: string, jeton: string) {
       db.prepare("INSERT INTO depots VALUES (?,?,?,NULL) ON CONFLICT(projet_id) DO UPDATE SET nom=excluded.nom, jeton=excluded.jeton, info=NULL").run(id, nom, jeton);
@@ -86,6 +220,66 @@ export function ouvrirBase(fichier?: string) {
         return c ? c.valeur : null;
       },
       ecrire(cle: string, valeur: string) { db.prepare("INSERT OR REPLACE INTO cache VALUES (?,?)").run(cle, valeur); },
+    },
+    journaliser(l: { utilisateurId: string; action: string; input_tokens: number; output_tokens: number; cache_creation_input_tokens: number; cache_read_input_tokens: number; fichiers: number }) {
+      db.prepare("INSERT INTO journal_ia (utilisateur_id, action, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, fichiers, cree_le) VALUES (?,?,?,?,?,?,?,?)")
+        .run(l.utilisateurId, l.action, l.input_tokens, l.output_tokens, l.cache_creation_input_tokens, l.cache_read_input_tokens, l.fichiers, new Date().toISOString());
+    },
+    /** Somme des jetons d'une journée UTC. Aucun texte. */
+    jetonsDuJour(debut: string, fin: string): number {
+      const r: any = db.prepare("SELECT COALESCE(SUM(input_tokens + output_tokens + cache_creation_input_tokens + cache_read_input_tokens), 0) AS n FROM journal_ia WHERE cree_le >= ? AND cree_le < ?").get(debut, fin);
+      return r.n;
+    },
+    /** Vrai seulement la première fois pour ce jour : une seule alerte. */
+    premiereAlerte(jour: string): boolean {
+      return db.prepare("INSERT INTO alertes (jour) VALUES (?) ON CONFLICT(jour) DO NOTHING").run(jour).changes === 1;
+    },
+    compterPack(pack: string): number {
+      const r: any = db.prepare("SELECT COUNT(*) AS n FROM credits WHERE pack = ? AND remboursement = 0").get(pack);
+      return r.n;
+    },
+    aDejaAchete(utilisateurId: string): boolean {
+      return !!db.prepare("SELECT 1 FROM credits WHERE utilisateur_id = ?").get(utilisateurId);
+    },
+    ajouterCredit(c: { utilisateurId: string; pack: string; cartes: number; redessins: number; lectures: number; fichiersMax: number; expireLe: string; sessionStripe: string; paiement: string | null }): boolean {
+      try {
+        db.prepare("INSERT INTO credits (id, utilisateur_id, pack, cartes, redessins, lectures, fichiers_max, expire_le, session_stripe, paiement, remboursement, cree_le) VALUES (?,?,?,?,?,?,?,?,?,?,0,?)")
+          .run(randomUUID(), c.utilisateurId, c.pack, c.cartes, c.redessins, c.lectures, c.fichiersMax, c.expireLe, c.sessionStripe, c.paiement, new Date().toISOString());
+        return true;
+      } catch { return false; }
+    },
+    echeanceActive(utilisateurId: string, maintenant: string): { expireLe: string; fichiersMax: number } | null {
+      const r: any = db.prepare("SELECT expire_le, fichiers_max FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ? ORDER BY expire_le DESC LIMIT 1").get(utilisateurId, maintenant);
+      return r ? { expireLe: r.expire_le, fichiersMax: r.fichiers_max } : null;
+    },
+    solde(utilisateurId: string, maintenant: string) {
+      const lignes = db.prepare("SELECT cartes, redessins, lectures, fichiers_max, expire_le FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ?").all(utilisateurId, maintenant) as any[];
+      const s = { cartes: 0, redessins: 0, lectures: 0, fichiersMax: 0, expireLe: null as string | null };
+      for (const l of lignes) {
+        s.cartes += l.cartes; s.redessins += l.redessins; s.lectures += l.lectures;
+        s.fichiersMax = Math.max(s.fichiersMax, l.fichiers_max);
+        if (!s.expireLe || l.expire_le > s.expireLe) s.expireLe = l.expire_le;
+      }
+      return s;
+    },
+    /** Retire une unité du lot qui expire le plus tôt et qui couvre la taille demandée. */
+    retrancher(utilisateurId: string, champ: "cartes" | "redessins" | "lectures", fichiers: number, maintenant: string): string | null {
+      const lignes = db.prepare(`SELECT id, fichiers_max FROM credits WHERE utilisateur_id = ? AND remboursement = 0 AND expire_le > ? AND ${champ} > 0 ORDER BY expire_le ASC`).all(utilisateurId, maintenant) as any[];
+      for (const l of lignes) {
+        if (champ === "lectures" && l.fichiers_max < fichiers) continue;
+        if (db.prepare(`UPDATE credits SET ${champ} = ${champ} - 1 WHERE id = ? AND ${champ} > 0`).run(l.id).changes === 1) return l.id;
+      }
+      return null;
+    },
+    rendre(id: string, champ: "cartes" | "redessins" | "lectures") {
+      db.prepare(`UPDATE credits SET ${champ} = ${champ} + 1 WHERE id = ?`).run(id);
+    },
+    retirerPaiement(paiement: string): boolean {
+      return db.prepare("UPDATE credits SET cartes = 0, redessins = 0, lectures = 0, remboursement = 1 WHERE paiement = ? AND remboursement = 0").run(paiement).changes > 0;
+    },
+    dernierCredit(utilisateurId: string): { expireLe: string; remboursement: boolean } | null {
+      const r: any = db.prepare("SELECT expire_le, remboursement FROM credits WHERE utilisateur_id = ? ORDER BY cree_le DESC LIMIT 1").get(utilisateurId);
+      return r ? { expireLe: r.expire_le, remboursement: !!r.remboursement } : null;
     },
   };
 }

@@ -70,8 +70,8 @@ test("mise à jour : le résumé dit quelles cases ont changé d'état et quels 
   const lignes = changements!.lignes;
   assert.ok(lignes.includes("« Réserver sans créer de compte » : À débloquer → Débloqué."), lignes.join("\n"));
   assert.ok(lignes.includes("« Payer en ligne » : À débloquer → En cours."));
-  assert.ok(lignes.some((l) => l.startsWith("Nouvel écart avec votre description sur")));
-  assert.ok(lignes.some((l) => l.startsWith("Trouvé dans le dépôt, sans être dans votre description :")));
+  assert.ok(lignes.some((l) => l.startsWith("Nouvel écart avec ta description sur")));
+  assert.ok(lignes.some((l) => l.startsWith("Trouvé dans le dépôt, sans être dans ta description :")));
   assert.ok(!lignes.some((l) => l.includes("« Payer sur place »")), "une case qui n'a pas bougé n'est pas citée");
 });
 
@@ -105,7 +105,7 @@ test("quand le dépôt contredit une correction, le résumé le dit et la correc
   const copie = avantLecture(avant);
   trouver(avant, "Payer sur place").etat = "done"; // ce que ferait une lecture qui trouve la case construite
   const c = apresLecture(copie, avant, "2026-11-20T08:00:00Z")!;
-  assert.deepEqual(c.lignes, ["« Payer sur place » : À débloquer → Débloqué. Votre correction (Après cette version) est conservée."]);
+  assert.deepEqual(c.lignes, ["« Payer sur place » : À débloquer → Débloqué. Ta correction (Après cette version) est conservée."]);
   assert.equal(trouver(avant, "Payer sur place").etat, "later");
 });
 

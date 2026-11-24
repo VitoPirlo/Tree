@@ -110,7 +110,7 @@ export function citationVerifiee(citation: string, description: string): string 
 
 const SANS_DEPOT: Record<"version" | "apres" | "hors_depot", { etat: Etat; texte: string }> = {
   version: { etat: "todo", texte: "Pas encore vérifié : aucun dépôt n'est connecté." },
-  apres: { etat: "later", texte: "Prévu après cette version, d'après votre description." },
+  apres: { etat: "later", texte: "Prévu après cette version, d'après ta description." },
   hors_depot: { etat: "out", texte: "Ne se fait pas dans le code : rien à vérifier dans un dépôt." },
 };
 

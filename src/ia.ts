@@ -2,6 +2,7 @@
 // Rien de ce que l'utilisateur écrit n'est journalisé ici.
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { z } from "zod";
 import { z as zod } from "zod";
 import { ArbreIA, QuestionsIA, type Arbre, type Question } from "./arbre.ts";
@@ -31,7 +32,39 @@ const JugementIA = zod.object({
   })),
 });
 
-const MODELE = "claude-opus-5-5";
+/** Modèle par étape. Le jugement reste sur Opus tant qu'il n'a pas été comparé ailleurs. */
+export const MODELES_DEFAUT = {
+  questions: "claude-haiku-4-5",
+  reperage: "claude-sonnet-5-5",
+  arbre: "claude-opus-5-5",
+  ajustement: "claude-opus-5-5",
+  jugement: "claude-opus-5-5",
+} as const;
+export type EtapeIA = keyof typeof MODELES_DEFAUT;
+
+export function modeles(): Record<EtapeIA, string> {
+  return {
+    questions: process.env.TREE_MODELE_QUESTIONS || MODELES_DEFAUT.questions,
+    reperage: process.env.TREE_MODELE_REPERAGE || MODELES_DEFAUT.reperage,
+    arbre: process.env.TREE_MODELE_ARBRE || MODELES_DEFAUT.arbre,
+    ajustement: process.env.TREE_MODELE_ARBRE || MODELES_DEFAUT.ajustement,
+    jugement: process.env.TREE_MODELE_JUGEMENT || MODELES_DEFAUT.jugement,
+  };
+}
+
+export interface UsageIA {
+  utilisateurId: string;
+  action: EtapeIA;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+  fichiers: number;
+}
+export const contexteUsage = new AsyncLocalStorage<{ utilisateurId: string }>();
+let suivi: { journal: (u: UsageIA) => void; garde: () => void } | null = null;
+/** Branché par le serveur : journal des jetons et plafond du jour. Aucun texte. */
+export function brancherSuivi(s: { journal: (u: UsageIA) => void; garde: () => void } | null) { suivi = s; }
 
 export class ErreurIA extends Error {}
 
@@ -51,7 +84,7 @@ export interface ContexteAjustement {
   remarque: string;
 }
 
-const REGLES_COMMUNES = `Tu aides un fondateur ou un dirigeant qui ne lit pas le code à comprendre et piloter le logiciel qu'il fait construire. Il te donne la description de son projet, en texte libre. Tu écris en français, sans aucun jargon technique, et quand tu t'adresses à lui tu le vouvoies.`;
+const REGLES_COMMUNES = `Tu aides un fondateur ou un dirigeant qui ne lit pas le code à comprendre et piloter le logiciel qu'il fait construire. Il te donne la description de son projet, en texte libre. Tu écris en français, sans aucun jargon technique, et quand tu t'adresses à lui tu le tutoies.`;
 
 const SYSTEME_QUESTIONS = `${REGLES_COMMUNES}
 
@@ -153,15 +186,14 @@ class IAAnthropic implements IA {
   private client = cleOutil() ? new Anthropic({ apiKey: cleOutil() }) : new Anthropic();
 
   /** « commun » est la partie du message identique d'un appel à l'autre : elle est mise en cache côté IA. */
-  private async appel<S extends z.ZodType>(schema: S, systeme: string, message: string, effort: "medium" | "high", commun?: string): Promise<z.infer<S>> {
+  private async appel<S extends z.ZodType>(schema: S, etape: EtapeIA, systeme: string, message: string, effort: "medium" | "high", fichiers = 0, commun?: string): Promise<z.infer<S>> {
     try {
-      // En flux, pour ne pas buter sur un délai d'attente quand l'arbre est long à écrire.
+      suivi?.garde();
       const flux = this.client.beta.messages.stream({
-        model: MODELE,
+        model: modeles()[etape],
         max_tokens: 64000,
         thinking: { type: "adaptive" },
         output_config: { effort, format: zodOutputFormat(schema) },
-        // Si le modèle décline la demande, l'API la rejoue sur un modèle de repli.
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: systeme,
@@ -173,35 +205,45 @@ class IAAnthropic implements IA {
         }],
       });
       const reponse = await flux.finalMessage();
+      const qui = contexteUsage.getStore();
+      if (suivi && qui) {
+        const u = reponse.usage;
+        suivi.journal({
+          utilisateurId: qui.utilisateurId, action: etape, fichiers,
+          input_tokens: u?.input_tokens ?? 0, output_tokens: u?.output_tokens ?? 0,
+          cache_creation_input_tokens: u?.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: u?.cache_read_input_tokens ?? 0,
+        });
+      }
       if (reponse.stop_reason === "refusal") throw new ErreurIA("L'IA a refusé de traiter cette description.");
       if (reponse.stop_reason === "max_tokens") throw new ErreurIA("La réponse de l'IA est trop longue. Essayez avec une description plus courte.");
       const texte = reponse.content.map((b) => (b.type === "text" ? b.text : "")).join("");
       return schema.parse(JSON.parse(texte));
     } catch (e) {
       if (e instanceof ErreurIA) throw e;
-      if (e instanceof Anthropic.AuthenticationError) throw new ErreurIA("La clé Anthropic est refusée. Vérifiez-la dans les réglages.");
-      if (e instanceof Anthropic.RateLimitError) throw new ErreurIA("Trop de demandes à l'IA en même temps. Réessayez dans une minute.");
-      if (e instanceof Anthropic.APIConnectionError) throw new ErreurIA("Impossible de joindre l'IA. Vérifiez la connexion et réessayez.");
-      if (e instanceof Anthropic.APIError) throw new ErreurIA(`L'IA a répondu par une erreur (code ${e.status ?? "inconnu"}). Réessayez.`);
-      throw new ErreurIA("La réponse de l'IA est illisible. Réessayez.");
+      if (e instanceof Anthropic.AuthenticationError) throw new ErreurIA("La clé Anthropic est refusée. Vérifie-la dans les réglages.");
+      if (e instanceof Anthropic.RateLimitError) throw new ErreurIA("Trop de demandes à l'IA en même temps. Réessaie dans une minute.");
+      if (e instanceof Anthropic.APIConnectionError) throw new ErreurIA("Impossible de joindre l'IA. Vérifie la connexion et réessaie.");
+      if (e instanceof Anthropic.APIError) throw new ErreurIA(`L'IA a répondu par une erreur (code ${e.status ?? "inconnu"}). Réessaie.`);
+      throw new ErreurIA("La réponse de l'IA est illisible. Réessaie.");
     }
   }
 
   poserQuestions(description: string) {
-    return this.appel(QuestionsIA, SYSTEME_QUESTIONS, `<description>\n${description}\n</description>`, "medium");
+    return this.appel(QuestionsIA, "questions", SYSTEME_QUESTIONS, `<description>\n${description}\n</description>`, "medium");
   }
 
   planifier(c: ContextePlan) {
     const cases = c.cases.map((x) => `${x.ref} · ${x.titre} : ${x.aQuoiCaSert}`).join("\n");
-    return this.appel(PlanIA, SYSTEME_PLAN,
-      `<description>\n${c.description}\n</description>\n\n<familles_et_themes>\n${c.familles.map((f) => `${f.titre} : ${f.themes.join(" ; ")}`).join("\n")}\n</familles_et_themes>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>\n\n<ajouts_de_la_lecture_precedente>\n${c.dejaTrouves.map((a) => `${a.famille} · ${a.theme} · ${a.titre}`).join("\n") || "(aucun)"}\n</ajouts_de_la_lecture_precedente>`, "medium");
+    return this.appel(PlanIA, "reperage", SYSTEME_PLAN,
+      `<description>\n${c.description}\n</description>\n\n<familles_et_themes>\n${c.familles.map((f) => `${f.titre} : ${f.themes.join(" ; ")}`).join("\n")}\n</familles_et_themes>\n\n<cases>\n${cases}\n</cases>\n\n<documentation>\n${blocFichiers(c.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.chemins.join("\n")}\n</fichiers_du_depot>\n\n<branches>\n${c.branches.join("\n")}\n</branches>\n\n<demandes_de_fusion>\n${lignesFusions(c, false)}\n</demandes_de_fusion>\n\n<ajouts_de_la_lecture_precedente>\n${c.dejaTrouves.map((a) => `${a.famille} · ${a.theme} · ${a.titre}`).join("\n") || "(aucun)"}\n</ajouts_de_la_lecture_precedente>`, "medium", c.chemins.length);
   }
 
   juger(c: ContexteJugement) {
     const cases = c.cases.map((x) =>
       `${x.ref} · ${x.titre}${x.origine === "depot" ? " (trouvée dans le dépôt)" : ""} : ${x.aQuoiCaSert}${x.citation ? `\n  Ce que dit la description : « ${x.citation} »` : ""}\n  À regarder : fichiers ${x.fichiers.join(", ") || "aucun"} ; demandes de fusion ${x.fusions.join(", ") || "aucune"} ; branches ${x.branches.join(", ") || "aucune"}`).join("\n\n");
-    return this.appel(JugementIA, SYSTEME_JUGEMENT,
-      `Famille : ${c.famille}. Responsable de la famille : ${c.responsable || "non précisé"}. Branche principale : ${c.brancheDefaut}.\n\n<cases>\n${cases}\n</cases>\n\n<fichiers>\n${blocFichiers(c.fichiers)}\n</fichiers>\n\n<demandes_de_fusion>\n${lignesFusions(c, true)}\n</demandes_de_fusion>`, "high",
+    return this.appel(JugementIA, "jugement", SYSTEME_JUGEMENT,
+      `Famille : ${c.famille}. Responsable de la famille : ${c.responsable || "non précisé"}. Branche principale : ${c.brancheDefaut}.\n\n<cases>\n${cases}\n</cases>\n\n<fichiers>\n${blocFichiers(c.fichiers)}\n</fichiers>\n\n<demandes_de_fusion>\n${lignesFusions(c, true)}\n</demandes_de_fusion>`, "high", c.fichiers.length,
       `<description>\n${c.commun.description}\n</description>\n\n<documentation>\n${blocFichiers(c.commun.docs)}\n</documentation>\n\n<fichiers_du_depot>\n${c.commun.chemins.join("\n")}\n</fichiers_du_depot>`);
   }
 
@@ -210,7 +252,7 @@ class IAAnthropic implements IA {
       `Famille : ${f.titre} | responsable : ${f.responsable ?? "non précisé"} | emblème : ${f.embleme}\n  ${f.description}\n` +
       f.themes.map((t) => `  Thème : ${t.titre}\n` + t.cases.map((x) => `    - ${x.titre} [${x.base === "later" ? "apres" : x.base === "out" ? "hors_depot" : "version"}] : ${x.aQuoiCaSert}${x.citation ? ` (citation : ${x.citation})` : ""}`).join("\n")).join("\n")).join("\n\n");
     const nouvelles = c.nouvelles.map((r, i) => `Question ${i + 1} : ${r.question.question}\nRéponse : ${r.reponse.trim()}`).join("\n\n");
-    return this.appel(ArbreIA, SYSTEME_AJUSTEMENT,
+    return this.appel(ArbreIA, "ajustement", SYSTEME_AJUSTEMENT,
       `<description>\n${c.description}\n</description>\n\n<arbre_actuel>\nProduit : ${c.arbre.produit.nom}. ${c.arbre.produit.resume}\n\n${arbre}\n</arbre_actuel>\n\n<deja_pris_en_compte>\n${c.dejaPris.join("\n") || "(rien)"}\n</deja_pris_en_compte>\n\n<nouvelles_reponses>\n${nouvelles || "(aucune)"}\n</nouvelles_reponses>\n\n<remarque>\n${c.remarque.trim() || "(aucune)"}\n</remarque>`, "high");
   }
 
@@ -218,7 +260,7 @@ class IAAnthropic implements IA {
     const qr = reponses
       .map((r, i) => `Question ${i + 1} : ${r.question.question}\nRéponse : ${r.reponse.trim() || "(sans réponse : ne suppose rien)"}`)
       .join("\n\n");
-    return this.appel(ArbreIA, SYSTEME_ARBRE, `<description>\n${description}\n</description>\n\n<reponses>\n${qr || "(aucune question posée)"}\n</reponses>`, "high");
+    return this.appel(ArbreIA, "arbre", SYSTEME_ARBRE, `<description>\n${description}\n</description>\n\n<reponses>\n${qr || "(aucune question posée)"}\n</reponses>`, "high");
   }
 }
 

@@ -67,7 +67,8 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .fl{position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;background:var(--drift);color:#fff;font-family:var(--display);font-weight:700;font-size:13px;display:grid;place-items:center;box-shadow:0 0 0 2.5px var(--bg)}
 
 /* habillage */
-.top{position:absolute;left:14px;top:12px;right:14px;display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;justify-content:space-between;pointer-events:none}
+.top{position:absolute;left:14px;top:12px;right:14px;z-index:2;display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;justify-content:space-between;pointer-events:none}
+#board{z-index:1}
 .top>*{pointer-events:auto}
 .hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .chip{background:var(--bg);border:2px solid var(--ink);border-radius:12px;padding:6px 12px;box-shadow:0 3px 0 var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
@@ -114,6 +115,27 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
   .top{left:8px;right:8px;top:8px}
 }
 @media (prefers-reduced-motion:reduce){ .ln.wip,.st.wip,.st.wip .hex{animation:none} .nd{transition:none} }
+
+/* vue liste : lisible sans faire glisser la carte, surtout sur un téléphone */
+body.liste{overflow:auto}
+body.liste #board{position:relative;inset:auto;overflow:visible;height:auto;min-height:100%;cursor:default;touch-action:manipulation}
+body.liste #layer{position:relative}
+body.liste .top{position:relative;top:auto;left:auto;right:auto;background:var(--bg);z-index:3;padding:8px 8px 0}
+body.liste .card{position:fixed;z-index:6;top:76px;right:14px;width:min(410px,calc(100% - 28px));max-height:calc(100vh - 96px)}
+@media (max-width:640px){
+  body.liste .card{top:auto;bottom:12px;left:8px;right:8px;width:auto;max-height:62vh}
+  body.liste .chip, body.liste .tg{padding:4px 8px;font-size:12px}
+  body.liste .top{gap:6px}
+}
+body.liste .zoom, body.liste .hint{display:none}
+.liste-cases{padding:8px 16px 40px;display:grid;gap:16px;max-width:720px}
+.liste-cases h2{font-family:var(--display);font-size:18px;margin:12px 0 0}
+.liste-cases h3{margin:8px 0 0;font-size:13px;color:var(--muted);font-weight:600}
+.liste-cases ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ligne{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-weight:600}
+.ligne[aria-pressed="true"]{border-color:var(--ink)}
+.ligne .tag{flex:none}
+.ligne .tag.pct{background:var(--ink);color:#fff}
 
 /* étape 4 : mise à jour et corrections à la main */
 .gp>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
