@@ -27,32 +27,81 @@
 <main id="accueil" class="landing">
   <p class="marque">{{NOM}}</p>
   <h1>{{PHRASE}}</h1>
+  <p class="sub">{{SOUS_TITRE}}</p>
   <div class="row">
-    <a class="btn" href="#/inscription">Créer un accès</a>
+    <a class="btn" href="#/inscription">Je me lance</a>
     <a class="btn ghost" href="#/entrer">J'ai déjà un accès</a>
   </div>
+
   <div class="apercu" role="img" aria-label="{{IMAGE_ALT}}">
-    <div class="ap-root">Votre<br>produit</div>
+    <div class="ap-root">Ton<br>produit</div>
     <div class="ap-col">
       <p class="ap-fam bleu">Parcours client</p>
       <p class="ap-fam violet">Côté atelier</p>
       <p class="ap-fam orange">Confiance</p>
     </div>
     <div class="ap-col">
-      <p class="ap-case bleu">Réserver en une minute <small>Débloqué</small></p>
+      <p class="ap-case bleu">Réserver en une minute <small>Fait</small></p>
       <p class="ap-case bleu">Valider le devis</p>
       <p class="ap-case violet">Voir la semaine <small>En cours</small></p>
       <p class="ap-case gris">Prévenir par SMS <small>À débloquer</small></p>
       <p class="ap-case orange">Chaque atelier, ses clients</p>
     </div>
   </div>
+  <p class="sub">{{MENTION}}</p>
+  <p class="statut"><span>{{LEG1}}</span><span>{{LEG2}}</span><span>{{LEG3}}</span><span>{{LEG4}}</span><span>{{LEG5}}</span></p>
+
   <ol class="steps-l">
-    <li><b>1</b><span><strong>Décrivez le produit.</strong> Avec vos mots, ou avec un texte préparé par l'IA qui connaît déjà le projet.</span></li>
-    <li><b>2</b><span><strong>L'arbre se dessine.</strong> Les grands chantiers, les sujets, et ce qui est fait, en cours ou encore à faire.</span></li>
-    <li><b>3</b><span><strong>Reliez GitHub, en lecture seule.</strong> Chaque case est vérifiée dans le dépôt. Un jeton qui pourrait le modifier est refusé.</span></li>
+    <li><b>1</b><span><strong>{{ETAPE1_T}}</strong> {{ETAPE1_X}}</span></li>
+    <li><b>2</b><span><strong>{{ETAPE2_T}}</strong> {{ETAPE2_X}}</span></li>
+    <li><b>3</b><span><strong>{{ETAPE3_T}}</strong> {{ETAPE3_X}}</span></li>
   </ol>
-  <p class="note">L'essai comprend {{PLAFOND}} actions. Dessiner un arbre, l'ajuster ou lire le dépôt en utilise une.</p>
-  <p class="legal">{{CONFIDENTIALITE}}</p>
+  <p class="note">{{NOTE}}</p>
+
+  <section class="bloc">
+    <h2>{{VOIR_TITRE}}</h2>
+    <p>{{VOIR1}}</p>
+    <p>{{VOIR2}}</p>
+    <p>{{VOIR3}}</p>
+    <p>{{VOIR4}}</p>
+  </section>
+
+  <section class="bloc">
+    <h2>{{DONNEES_TITRE}}</h2>
+    <p>{{DONNEES_INTRO}}</p>
+    <ul>
+      <li>{{PUCE1}}</li>
+      <li>{{PUCE2}}</li>
+      <li>{{PUCE3}}</li>
+      <li>{{PUCE4}}</li>
+    </ul>
+  </section>
+
+  <section class="bloc">
+    <h2>{{POURQUI_TITRE}}</h2>
+    <p>{{POURQUI}}</p>
+    <p>{{POURQUI2}}</p>
+  </section>
+
+  <section class="bloc faq">
+    <h2>Questions fréquentes</h2>
+    <details><summary>{{FAQ1_Q}}</summary><p>{{FAQ1_R}}</p></details>
+    <details><summary>{{FAQ2_Q}}</summary><p>{{FAQ2_R}}</p></details>
+    <details><summary>{{FAQ3_Q}}</summary><p>{{FAQ3_R}}</p></details>
+    <details><summary>{{FAQ_ESSAI_Q}}</summary><p>{{FAQ_ESSAI_R}}{{FAQ_ESSAI_SUITE}}</p></details>
+    <details><summary>{{FAQ4_Q}}</summary><p>{{FAQ4_R}}</p></details>
+    <details><summary>{{FAQ5_Q}}</summary><p>{{FAQ5_R}}</p></details>
+  </section>
+
+  <section class="bloc">
+    <h2>{{CTA_TITRE}}</h2>
+    <p>{{CTA_TEXTE}}</p>
+    <div class="row">
+      <a class="btn" href="#/inscription">Je me lance</a>
+      <a class="btn ghost" href="#/entrer">J'ai déjà un accès</a>
+      {{CTA_LIEN}}
+    </div>
+  </section>
 </main>
 <div id="vue" hidden></div>
 <script type="module" src="/app.js"></script>

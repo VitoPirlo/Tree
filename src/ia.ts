@@ -51,7 +51,7 @@ export interface ContexteAjustement {
   remarque: string;
 }
 
-const REGLES_COMMUNES = `Tu aides un fondateur ou un dirigeant qui ne lit pas le code à comprendre et piloter le logiciel qu'il fait construire. Il te donne la description de son projet, en texte libre. Tu écris en français, sans aucun jargon technique, et quand tu t'adresses à lui tu le vouvoies.`;
+const REGLES_COMMUNES = `Tu aides un fondateur ou un dirigeant qui ne lit pas le code à comprendre et piloter le logiciel qu'il fait construire. Il te donne la description de son projet, en texte libre. Tu écris en français, sans aucun jargon technique, et quand tu t'adresses à lui tu le tutoies.`;
 
 const SYSTEME_QUESTIONS = `${REGLES_COMMUNES}
 
@@ -179,11 +179,11 @@ class IAAnthropic implements IA {
       return schema.parse(JSON.parse(texte));
     } catch (e) {
       if (e instanceof ErreurIA) throw e;
-      if (e instanceof Anthropic.AuthenticationError) throw new ErreurIA("La clé Anthropic est refusée. Vérifiez-la dans les réglages.");
-      if (e instanceof Anthropic.RateLimitError) throw new ErreurIA("Trop de demandes à l'IA en même temps. Réessayez dans une minute.");
-      if (e instanceof Anthropic.APIConnectionError) throw new ErreurIA("Impossible de joindre l'IA. Vérifiez la connexion et réessayez.");
-      if (e instanceof Anthropic.APIError) throw new ErreurIA(`L'IA a répondu par une erreur (code ${e.status ?? "inconnu"}). Réessayez.`);
-      throw new ErreurIA("La réponse de l'IA est illisible. Réessayez.");
+      if (e instanceof Anthropic.AuthenticationError) throw new ErreurIA("La clé Anthropic est refusée. Vérifie-la dans les réglages.");
+      if (e instanceof Anthropic.RateLimitError) throw new ErreurIA("Trop de demandes à l'IA en même temps. Réessaie dans une minute.");
+      if (e instanceof Anthropic.APIConnectionError) throw new ErreurIA("Impossible de joindre l'IA. Vérifie la connexion et réessaie.");
+      if (e instanceof Anthropic.APIError) throw new ErreurIA(`L'IA a répondu par une erreur (code ${e.status ?? "inconnu"}). Réessaie.`);
+      throw new ErreurIA("La réponse de l'IA est illisible. Réessaie.");
     }
   }
 

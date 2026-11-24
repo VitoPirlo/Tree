@@ -189,7 +189,7 @@ export async function lireDepot(
 
 const REPLI: Record<string, string> = {
   todo: "Rien trouvé dans le dépôt à ce sujet.",
-  later: "Prévu après cette version, d'après votre description. Rien trouvé dans le dépôt.",
+  later: "Prévu après cette version, d'après ta description. Rien trouvé dans le dépôt.",
 };
 
 /** Applique à une case la décision prise par le code, et écrit un « Où on en est » qui ne dit jamais plus que ce qui est prouvé. */
@@ -207,7 +207,7 @@ export function appliquer(
   c.horsCode = d.etat === "todo" && !d.nonVerifie && v?.nature === "hors_code";
   c.decision = d.etat === "todo" && !d.nonVerifie ? net(v?.decision) : "";
   c.ecart = v ? verifierEcart(v.ecart, ctx.description, faits, d.preuves) : null;
-  if (!c.ecart && c.origine === "depot" && construit) c.ecart = { citation: null, constat: "Construit dans le dépôt, alors que votre description n'en parle pas." };
+  if (!c.ecart && c.origine === "depot" && construit) c.ecart = { citation: null, constat: "Construit dans le dépôt, alors que ta description n'en parle pas." };
   // Un prompt seulement pour du code à écrire, sur une case dont on est sûr qu'elle n'est pas faite.
   c.prompt = d.etat === "todo" && !d.nonVerifie && v?.avis === "pas_fait" && !c.horsCode ? assemblerPrompt(v.prompt, ctx.depot) : null;
   const dit = (v?.ouOnEnEst ?? "").replace(/\s+/g, " ").trim();

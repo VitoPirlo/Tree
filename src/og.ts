@@ -65,7 +65,7 @@ function dessiner(): Promise<Buffer> {
   phrase.forEach((l, i) => ctx.fillText(l, 72, 78 + taille + 36 + i * 40));
 
   const yEtapes = 430;
-  const etapes = ["Décrire le produit", "Voir l'arbre", "Relier GitHub"];
+  const etapes = ["Décrire le produit", "Voir la carte", "Relier GitHub"];
   etapes.forEach((etape, i) => {
     const x = 72 + i * 230;
     ctx.fillStyle = "#1b1f2a";
@@ -107,7 +107,7 @@ function dessiner(): Promise<Buffer> {
     ctx.fillRect(960, y, 168, 56);
     ctx.fillStyle = "#ffffff";
     ctx.font = "14pt dejavu-bold";
-    ctx.fillText(["Fait", "En cours", "À faire"][i], 976, y + 16);
+    ctx.fillText(["Fait", "En cours", "À débloquer"][i], 976, y + 16);
   });
 
   return encoder(img);

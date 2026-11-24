@@ -11,7 +11,7 @@ import { creerIA, ErreurIA, type IA } from "./ia.ts";
 import { DEPOT_DEMO, DESCRIPTION_DEMO } from "./demo.ts";
 import { DepotGitHub, ErreurDepot, lireNomDepot, type Depot } from "./github.ts";
 import { lireDepot } from "./lecture.ts";
-import { CONFIDENTIALITE, DESCRIPTION_COURTE, IMAGE_ALT, messagePlafond, NOM_PRODUIT, PHRASE, phraseEssai, PLAFOND_IA_DEFAUT } from "./marque.ts";
+import { messagePlafond, NOM_PRODUIT, PHRASE, phraseEssai, PLAFOND_IA_DEFAUT, textesAccueil } from "./marque.ts";
 import { faviconSvg, imageLien } from "./og.ts";
 import { annulerCorrection, apresLecture, avantLecture, corrigerCase, reprendre } from "./suivi.ts";
 
@@ -126,7 +126,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       .catch((e) => {
         base.rendreAction(u.id);
         suivi.enCours = false;
-        suivi.erreur = e instanceof ErreurDepot || e instanceof ErreurIA ? e.message : "La lecture du dépôt a échoué. Réessayez.";
+        suivi.erreur = e instanceof ErreurDepot || e instanceof ErreurIA ? e.message : "La lecture du dépôt a échoué. Réessaie.";
         if (!(e instanceof ErreurDepot || e instanceof ErreurIA)) console.error("lecture interrompue :", e instanceof Error ? e.name : "inconnue");
       });
   }
@@ -148,7 +148,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       const u = qui(req);
       const baseEtat = {
         connecte: !!u, modeDemo: ia.modeDemo, descriptionDemo: ia.modeDemo ? DESCRIPTION_DEMO : null,
-        nom: NOM_PRODUIT, phrase: PHRASE, description: DESCRIPTION_COURTE, confidentialite: CONFIDENTIALITE,
+        nom: NOM_PRODUIT, phrase: PHRASE, description: textesAccueil(plafond).DESCRIPTION, confidentialite: textesAccueil(plafond).CONFIDENTIALITE,
         codeRequis, plafond,
       };
       if (!u) return { ...baseEtat, email: null, proprietaire: false, reste: null, texteEssai: phraseEssai(plafond, plafond), mesures: null };
@@ -162,7 +162,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       return { ok: true };
     }
     if (chemin === "/api/connexion" && m === "POST") {
-      if (bloque(req)) throw new ErreurHttp(429, "Trop d'essais. Réessayez dans un quart d'heure.");
+      if (bloque(req)) throw new ErreurHttp(429, "Trop d'essais. Réessaie dans un quart d'heure.");
       const recu = await corps(req);
       const essai = String(recu.motDePasse ?? "");
       const email = String(recu.email ?? "").trim().toLowerCase();
@@ -179,13 +179,13 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       return { connecte: true };
     }
     if (chemin === "/api/inscription" && m === "POST") {
-      if (bloque(req)) throw new ErreurHttp(429, "Trop d'essais. Réessayez dans un quart d'heure.");
+      if (bloque(req)) throw new ErreurHttp(429, "Trop d'essais. Réessaie dans un quart d'heure.");
       const recu = await corps(req);
       const email = String(recu.email ?? "").trim().toLowerCase();
       const nom = String(recu.nom ?? "").trim().slice(0, 80) || "Vous";
       const mot = String(recu.motDePasse ?? "");
       const code = String(recu.code ?? "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) throw new ErreurHttp(400, "Indiquez une adresse e-mail valide.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) throw new ErreurHttp(400, "Indique une adresse e-mail valide.");
       if (mot.length < 8 || mot.length > 200) throw new ErreurHttp(400, "Le mot de passe doit faire au moins 8 caractères.");
       if (email === emailOwner || base.trouverParEmail(email)) throw new ErreurHttp(400, "Un accès existe déjà avec cette adresse.");
       if (codeRequis && !base.reserverCode(code)) { noterEchec(req); throw new ErreurHttp(400, "Ce code d'invitation ne convient pas, ou il a déjà servi."); }
@@ -212,9 +212,9 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
     if (chemin === "/api/projets" && m === "GET") return base.lister(u.id).map((p) => ({ id: p.id, nom: p.nom, etape: p.etape, demo: p.demo, creeLe: p.creeLe }));
     if (chemin === "/api/projets" && m === "POST") {
       const description = String((await corps(req)).description ?? "").trim();
-      if (description.length < 80) throw new ErreurHttp(400, "La description est trop courte pour en tirer un arbre. Ajoutez quelques phrases sur ce que le produit doit faire.");
+      if (description.length < 80) throw new ErreurHttp(400, "La description est trop courte pour en tirer une carte. Ajoute quelques phrases sur ce que le produit doit faire.");
       if (description.length > MAX_DESCRIPTION) throw new ErreurHttp(400, "La description est trop longue (60 000 caractères au plus).");
-      if (creations.has(u.id)) throw new ErreurHttp(409, "Un arbre est déjà en train de se dessiner.");
+      if (creations.has(u.id)) throw new ErreurHttp(409, "Une carte est déjà en train de se dessiner.");
       creations.add(u.id);
       let reserve = false;
       try {
@@ -239,7 +239,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       if (!un[2] && m === "GET") return vue(projet, u);
       if (!un[2] && m === "DELETE") { base.supprimer(projet.id, u.id); return { supprime: true }; }
       if (un[2] === "/depot" && m === "POST") {
-        if (projet.etape !== "arbre") throw new ErreurHttp(400, "Générez d'abord l'arbre.");
+        if (projet.etape !== "arbre") throw new ErreurHttp(400, "Dessine d'abord la carte.");
         const recu = await corps(req);
         if (projet.demo) base.connecterDepot(projet.id, "exemple/roule", "");
         else {
@@ -247,7 +247,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
           const jeton = String(recu.jeton ?? "").trim();
           const distant = creerDepot(nom, jeton);
           const info = await distant.info();
-          if (info.ecriturePossible) throw new ErreurDepot(`${NOM_PRODUIT} refuse un jeton qui peut modifier le dépôt. Il n'a pas été enregistré. Créez-en un en lecture seule : Contents et Pull requests sur Read-only, rien d'autre.`);
+          if (info.ecriturePossible) throw new ErreurDepot(`${NOM_PRODUIT} refuse un accès qui peut modifier le dépôt. Il n'a pas été enregistré. Crée-en un en lecture seule : Contents et Pull requests sur Read-only, rien d'autre.`);
           base.connecterDepot(projet.id, nom, jeton);
         }
         base.mesure("depot");
@@ -271,13 +271,13 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
         return vue(base.trouver(projet.id, u.id)!, u);
       }
       if (un[2] === "/ajuster" && m === "POST") {
-        if (!projet.arbre) throw new ErreurHttp(400, "Générez d'abord l'arbre.");
-        if (lectures.get(projet.id)?.enCours) throw new ErreurHttp(409, "Une lecture du dépôt est en cours. Ajustez l'arbre quand elle sera terminée.");
+        if (!projet.arbre) throw new ErreurHttp(400, "Dessine d'abord la carte.");
+        if (lectures.get(projet.id)?.enCours) throw new ErreurHttp(409, "Une lecture du dépôt est en cours. Ajuste la carte quand elle sera terminée.");
         const recu = await corps(req);
         const remarque = String(recu.remarque ?? "").trim().slice(0, 4000);
         const saisies = projet.questions.map((_, i) => String(Array.isArray(recu.reponses) ? recu.reponses[i] ?? "" : "").trim().slice(0, 2000));
         const nouvelles = projet.questions.map((question, i) => ({ question, reponse: saisies[i] })).filter((r) => r.reponse);
-        if (!nouvelles.length && !remarque) throw new ErreurHttp(400, "Répondez à une question ou dites ce qui ne va pas dans l'arbre.");
+        if (!nouvelles.length && !remarque) throw new ErreurHttp(400, "Réponds à une question ou dis ce qui ne va pas dans la carte.");
         if (ajustements.has(projet.id)) throw new ErreurHttp(409, "Un ajustement est déjà en cours.");
         ajustements.add(projet.id);
         let reserve = false;
@@ -321,11 +321,8 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
   };
   async function pageAccueil(origine: string) {
     gabarit ??= await readFile(path.join(PUBLIC, "index.html"), "utf8");
-    const valeurs: Record<string, string> = {
-      NOM: echap(NOM_PRODUIT), PHRASE: echap(PHRASE), DESCRIPTION: echap(DESCRIPTION_COURTE),
-      CONFIDENTIALITE: echap(CONFIDENTIALITE), IMAGE_ALT: echap(IMAGE_ALT), ORIGINE: echap(origine),
-      PLAFOND: String(plafond),
-    };
+    const valeurs: Record<string, string> = { NOM: echap(NOM_PRODUIT), ORIGINE: echap(origine) };
+    for (const [cle, valeur] of Object.entries(textesAccueil(plafond))) valeurs[cle] = echap(valeur);
     return gabarit.replace(/\{\{([A-Z_]+)\}\}/g, (_, k: string) => valeurs[k] ?? "");
   }
 
@@ -361,7 +358,7 @@ export function creerServeur(base: Base, ia: IA, motDePasse = process.env.APP_PA
       }
     } catch (e) {
       const code = e instanceof ErreurHttp ? e.code : e instanceof ErreurIA ? 502 : e instanceof ErreurDepot ? 400 : 500;
-      const message = e instanceof ErreurHttp || e instanceof ErreurIA || e instanceof ErreurDepot ? e.message : "Erreur inattendue. Réessayez.";
+      const message = e instanceof ErreurHttp || e instanceof ErreurIA || e instanceof ErreurDepot ? e.message : "Erreur inattendue. Réessaie.";
       if (code === 500) console.error("erreur interne :", e instanceof Error ? e.name : "inconnue");
       if (!res.headersSent) res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ erreur: message }));
     }

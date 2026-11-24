@@ -47,8 +47,11 @@ test("page publique : le nom vient d'un seul endroit, avec l'aperçu du lien", a
     assert.match(page.headers.get("content-security-policy") ?? "", /script-src 'self'/);
     assert.match(html, new RegExp(`<title>${NOM_PRODUIT}</title>`));
     assert.ok(html.includes(PHRASE));
-    assert.ok(html.includes(CONFIDENTIALITE));
-    assert.ok(html.includes("Créer un accès"));
+    assert.ok(html.includes("On lit. On n'écrit pas."));
+    assert.ok(html.includes("Je me lance"));
+    assert.equal(html.toLowerCase().includes("jeton"), false);
+    const etatPublic = await (await fetch(url + "/api/etat")).json() as { confidentialite: string };
+    assert.equal(etatPublic.confidentialite, CONFIDENTIALITE);
     assert.match(html, /twitter:card" content="summary_large_image"/);
     assert.match(html, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png"/);
     assert.equal(html.includes("Carte produit"), false);
@@ -129,7 +132,7 @@ test("le plafond d'essai est annoncé, rendu en cas d'échec, et un second dessi
     const cookie = (await appel(url, "/api/connexion", { motDePasse: "secret" })).cookie.split(";")[0];
     const etat = (await appel(url, "/api/etat", undefined, cookie)).d;
     assert.match(etat.texteEssai, /12|1/);
-    assert.match(etat.texteEssai, /Il vous reste 1 action/);
+    assert.match(etat.texteEssai, /Il te reste 1 action/);
     assert.equal((await appel(url, "/api/projets", { description: DESCRIPTION_DEMO }, cookie)).code, 500);
     const lente = appel(url, "/api/projets", { description: DESCRIPTION_DEMO }, cookie);
     await new Promise((r) => setTimeout(r, 30));

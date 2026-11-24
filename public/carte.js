@@ -68,7 +68,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
     <div class="zoom" role="group" aria-label="Zoom">
       <button id="zo" aria-label="Dézoomer">−</button><button id="zi" aria-label="Zoomer">+</button><button id="zf">Tout voir</button>
     </div>
-    <div class="hint">Glissez pour vous déplacer · cliquez sur une case pour le détail</div>
+    <div class="hint">Glisse pour te déplacer · clique sur une case pour le détail</div>
     <aside class="card" id="card" hidden aria-live="polite"></aside>`;
   const $ = (s) => racine.querySelector(s);
   const board = $("#board"), layer = $("#layer");
@@ -153,42 +153,42 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
       h += `<span class="ey">Le produit</span><h2>${esc(arbre.produit.nom)}</h2><p>${esc(arbre.produit.resume)}</p>
         <p class="ev">${g.done} cases débloquées, ${g.wip} en cours, ${g.todo} à débloquer, ${g.later} prévues après cette version.</p>
         ${projet.depot?.sha
-          ? `<p class="ev">Carte établie à partir de votre description et du dépôt ${esc(projet.depot.nom)} (branche ${esc(projet.depot.brancheDefaut)} au ${dateFr(projet.depot.dateDernierCommit)}), lu le ${dateFr(projet.depot.luLe)}. « Débloqué » veut dire construit et testé, pas encore éprouvé en production. Les cases à débloquer sont des propositions de l'outil, déduites de votre description.</p>${projet.depot.fichiersIgnores ? `<p class="ev">Dépôt très volumineux : ${projet.depot.fichiersIgnores} fichiers n'ont pas été pris en compte.</p>` : ""}`
-          : `<p class="ev">Carte établie le ${le} à partir de votre description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}
+          ? `<p class="ev">Carte établie à partir de ta description et du dépôt ${esc(projet.depot.nom)} (branche ${esc(projet.depot.brancheDefaut)} au ${dateFr(projet.depot.dateDernierCommit)}), lue le ${dateFr(projet.depot.luLe)}. « Débloqué » veut dire construit et testé, pas encore éprouvé en production. Les cases à débloquer sont des propositions de l'outil, déduites de ta description.</p>${projet.depot.fichiersIgnores ? `<p class="ev">Dépôt très volumineux : ${projet.depot.fichiersIgnores} fichiers n'ont pas été pris en compte.</p>` : ""}`
+          : `<p class="ev">Carte établie le ${le} à partir de ta description seule. Aucun dépôt n'est connecté : aucune case n'est vérifiée, toutes sont des propositions de l'outil.</p>`}
         ${supprimer ? `<div class="tech"><button class="cp" id="suppr" type="button">Supprimer ce projet</button></div>` : ""}`;
     } else if (sel === "ecarts") {
-      h += `<span class="ey">Ce qui existe ne correspond pas à ce que vous avez écrit</span><h2>Écarts avec la description</h2><ul>`;
+      h += `<span class="ey">Ce qui existe ne correspond pas à ce que tu as écrit</span><h2>Écarts avec la description</h2><ul>`;
       F.forEach((f, fi) => f.themes.forEach((t, gi) => t.cases.forEach((n, ni) => { if (n.ecart) h += `<li><button data-go="s${fi}-${gi}-${ni}"><span>${esc(f.titre)} · <b>${esc(n.titre)}</b><br><span class="ev">${esc(n.ecart.constat)}</span></span></button></li>`; })));
       h += "</ul>";
     } else if (sel === "affiner") {
       const qs = projet.questions ?? [], rs = projet.reponses ?? [];
       const ouvertes = qs.map((q, i) => ({ ...q, i })).filter((q) => !rs[q.i]?.trim()), prises = qs.map((q, i) => ({ ...q, i })).filter((q) => rs[q.i]?.trim());
-      h += `<span class="ey">Votre arbre, à votre main</span><h2>Ajuster l'arbre</h2>
-        <p>Ce premier arbre vient de votre description seule. Répondez à ce que vous voulez, dans l'ordre que vous voulez : l'arbre se redessine en gardant tout ce qui ne change pas.</p>
+      h += `<span class="ey">Ta carte, à ta main</span><h2>Ajuster la carte</h2>
+        <p>Cette première carte vient de ta description seule. Réponds à ce que tu veux, dans l'ordre que tu veux : la carte se redessine en gardant tout ce qui ne change pas.</p>
         <div class="cor">
         ${ouvertes.map((q) => `<label>${esc(q.question)}<small class="ev">${esc(q.pourquoi)}</small><textarea rows="2" data-q="${q.i}" maxlength="2000"></textarea></label>`).join("")}
-        <label>${ouvertes.length ? "Autre chose ne va pas dans l'arbre ?" : "Quelque chose ne va pas dans l'arbre ?"}<small class="ev">Dites-le avec vos mots : une partie qui manque, une case de trop, un découpage qui ne vous parle pas.</small><textarea rows="4" id="aff-rem" maxlength="4000"></textarea></label>
-        <div id="aff-msg"></div><div class="row-tags"><button class="cp" id="aff-ok">Ajuster l'arbre</button></div></div>
-        ${prises.length || projet.remarques?.length ? `<details class="ev"><summary>Déjà pris en compte (${prises.length + (projet.remarques?.length ?? 0)})</summary><ul style="margin-top:6px">${prises.map((q) => `<li><span><b>${esc(q.question)}</b><br>${esc(rs[q.i])}</span></li>`).join("")}${(projet.remarques ?? []).map((r) => `<li><span><b>Votre remarque</b><br>${esc(r)}</span></li>`).join("")}</ul></details>` : ""}`;
+        <label>${ouvertes.length ? "Autre chose ne va pas dans la carte ?" : "Quelque chose ne va pas dans la carte ?"}<small class="ev">Dis-le avec tes mots : une partie qui manque, une case de trop, un découpage qui ne te parle pas.</small><textarea rows="4" id="aff-rem" maxlength="4000"></textarea></label>
+        <div id="aff-msg"></div><div class="row-tags"><button class="cp" id="aff-ok">Ajuster la carte</button></div></div>
+        ${prises.length || projet.remarques?.length ? `<details class="ev"><summary>Déjà pris en compte (${prises.length + (projet.remarques?.length ?? 0)})</summary><ul style="margin-top:6px">${prises.map((q) => `<li><span><b>${esc(q.question)}</b><br>${esc(rs[q.i])}</span></li>`).join("")}${(projet.remarques ?? []).map((r) => `<li><span><b>Ta remarque</b><br>${esc(r)}</span></li>`).join("")}</ul></details>` : ""}`;
     } else if (sel === "depot") {
       const l = projet.lecture, d = projet.depot;
       h += `<span class="ey">Dépôt GitHub · lecture seule</span>`;
-      if (l?.enCours) h += `<h2>Lecture en cours</h2><p class="wait">${esc(l.message)}</p><p class="ev">Cela prend quelques minutes. Vous pouvez laisser cette page ouverte.</p>`;
+      if (l?.enCours) h += `<h2>Lecture en cours</h2><p class="wait">${esc(l.message)}</p><p class="ev">Cela prend quelques minutes. Tu peux laisser cette page ouverte.</p>`;
       else if (d?.sha) h += `<h2>${esc(d.nom)}</h2><p>Branche ${esc(d.brancheDefaut)}, dernière modification le ${dateFr(d.dateDernierCommit)}. Lu le ${dateFr(d.luLe)}.</p>
-        ${d.ecriturePossible ? '<p class="dr"><b>Jeton trop large.</b> Ce jeton permet aussi d\'écrire dans le dépôt. L\'outil ne le fait jamais, mais un jeton en lecture seule est plus sûr.</p>' : '<p class="ev">L\'outil ne fait que lire : il ne peut rien modifier dans votre dépôt.</p>'}
+        ${d.ecriturePossible ? '<p class="dr"><b>Accès trop large.</b> Cet accès permet aussi d\'écrire dans le dépôt. L\'outil ne le fait jamais, mais un accès en lecture seule est plus sûr.</p>' : '<p class="ev">L\'outil ne fait que lire : il ne peut rien modifier dans ton dépôt.</p>'}
         ${l?.erreur ? `<p class="dr"><b>Mise à jour interrompue.</b> ${esc(l.erreur)}</p>` : ""}
         ${d.changements ? `<div class="tech"><span class="lb">Ce qui a changé depuis la lecture du ${dateFr(d.changements.depuis)}</span>${d.changements.lignes.length
           ? `<ul class="chg">${d.changements.lignes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
           : "<p>Rien n'a changé : la carte est la même qu'à la lecture précédente.</p>"}</div>` : ""}
         <div class="tech"><button class="cp" id="gh-maj">Mettre à jour</button><p class="ev" style="margin-top:8px">Relit le dépôt et résume ce qui a changé. Vos corrections à la main sont conservées.</p></div>`;
-      else h += `<h2>Connecter votre dépôt</h2>${l?.erreur ? `<p class="dr"><b>Lecture interrompue.</b> ${esc(l.erreur)}</p>` : ""}
+      else h += `<h2>Connecter ton dépôt</h2>${l?.erreur ? `<p class="dr"><b>Lecture interrompue.</b> ${esc(l.erreur)}</p>` : ""}
         ${projet.demo ? '<p>En mode démonstration, l\'outil lit un dépôt d\'exemple fourni avec lui.</p>' : `
-        <p>L'outil lit votre dépôt pour vérifier, case par case, ce qui est réellement construit. Il ne peut rien y modifier.</p>
-        <p><b>Un jeton qui peut modifier le dépôt est refusé</b>, et il n'est pas enregistré. Laissez le champ vide seulement pour un dépôt public.</p>
+        <p>L'outil lit ton dépôt pour vérifier, case par case, ce qui est réellement construit. Il ne peut rien y modifier.</p>
+        <p><b>Un accès qui peut modifier le dépôt est refusé</b>, et il n'est pas enregistré. Laisse le champ vide seulement pour un dépôt public.</p>
         <p class="ev">${esc(etat?.confidentialite || "")}</p>
         <label>Dépôt<input id="gh-depot" placeholder="proprietaire/nom" value="${esc(d?.nom ?? "")}" autocomplete="off"></label>
-        <label>Jeton en lecture seule<input id="gh-jeton" type="password" autocomplete="off"><small>Laissez vide pour un dépôt public.</small></label>
-        <details class="ev"><summary>Comment créer ce jeton</summary><p style="margin-top:6px">Sur GitHub : Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token. Choisissez « Only select repositories » et votre dépôt, puis dans « Repository permissions » mettez <b>Contents</b> et <b>Pull requests</b> sur « Read-only ». Rien d'autre.</p></details>`}
+        <label>Accès en lecture seule<input id="gh-jeton" type="password" autocomplete="off"><small>Laisse vide pour un dépôt public.</small></label>
+        <details class="ev"><summary>Comment créer cet accès</summary><p style="margin-top:6px">Sur GitHub : Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token. Choisis « Only select repositories » et ton dépôt, puis dans « Repository permissions » mets <b>Contents</b> et <b>Pull requests</b> sur « Read-only ». Rien d'autre.</p></details>`}
         <div id="gh-msg"></div><button class="cp" id="gh-go">${projet.demo ? "Lire le dépôt d'exemple" : "Connecter et lire le dépôt"}</button>`;
     } else if (sel[0] === "f") {
       const fi = +sel.slice(1), f = F[fi], c = stat(toutes(f));
@@ -200,11 +200,11 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
     } else {
       const [fi, gi, ni] = sel.slice(1).split("-").map(Number), f = F[fi], n = f.themes[gi].cases[ni];
       h += `<span class="ey">${esc(f.titre)} · ${esc(f.themes[gi].titre)}</span><h2>${esc(n.titre)}</h2><span class="row-tags"><span class="tag ${n.etat}">${LABEL[n.etat]}</span>${n.nonVerifie ? '<span class="tag todo">Non vérifié</span>' : ""}${n.corrige ? '<span class="tag later">Corrigé par vous</span>' : ""}</span>
-        ${n.corrige?.etat ? `<p class="ev">Vous avez fixé cet état à la main. L'outil, lui, a lu dans le dépôt : « ${LABEL[n.etatLu]} ». Le texte ci-dessous est celui de l'outil.</p>` : ""}
+        ${n.corrige?.etat ? `<p class="ev">Tu as fixé cet état à la main. L'outil, lui, a lu dans le dépôt : « ${LABEL[n.etatLu]} ». Le texte ci-dessous est celui de l'outil.</p>` : ""}
         <div><span class="lb">À quoi ça sert</span><p>${esc(n.aQuoiCaSert)}</p></div>
         <div><span class="lb">Où on en est</span><p>${esc(n.ouOnEnEst)}</p></div>
-        ${n.citation ? `<div><span class="lb">D'après votre description</span><blockquote>« ${esc(n.citation)} »</blockquote></div>` : ""}
-        ${n.ecart ? `<div class="dr"><b>Écart avec votre description.</b> ${n.ecart.citation ? `Vous avez écrit : « ${esc(n.ecart.citation)} ». ` : ""}${esc(n.ecart.constat)}</div>` : ""}`;
+        ${n.citation ? `<div><span class="lb">D'après ta description</span><blockquote>« ${esc(n.citation)} »</blockquote></div>` : ""}
+        ${n.ecart ? `<div class="dr"><b>Écart avec ta description.</b> ${n.ecart.citation ? `Tu as écrit : « ${esc(n.ecart.citation)} ». ` : ""}${esc(n.ecart.constat)}</div>` : ""}`;
       const qui = (ts) => `<ul class="who">${ts.map((t) => `<li><b>${esc(t.qui)}</b><span>${esc(t.quoi)}</span></li>`).join("")}</ul>`;
       if (n.etat === "done") {
         const livraisons = (n.preuves ?? []).filter((p) => p.type === "fusion" && p.etat === "fusionnee");
@@ -220,10 +220,10 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
         if (n.horsCode) h += `<p class="ev">Ce n'est pas du code à écrire : c'est une démarche ou une décision.</p>`;
         if (n.decision) h += `<div class="tech"><span class="lb">Décision à prendre avant</span><p>${esc(n.decision)}</p></div>`;
         if (n.taches?.length) h += `<div class="tech"><span class="lb">Qui doit faire quoi${n.prompt ? " avant" : ""}</span>${qui(n.taches)}</div>`;
-        if (n.prompt) h += `<div class="tech"><span class="lb">Prompt pour le réaliser, aligné sur le dépôt</span><pre id="pr">${esc(n.prompt)}</pre><button class="cp" id="cp">Copier le prompt</button><p class="ev" style="margin-top:8px">À coller dans votre propre outil de développement. ${esc(nom)} ne lance rien lui-même.</p></div>`;
-        if (!n.nonVerifie && n.origine !== "depot") h += `<p class="ev">Proposition de l'outil, déduite de votre description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>`;
+        if (n.prompt) h += `<div class="tech"><span class="lb">Texte pour le réaliser, aligné sur le dépôt</span><pre id="pr">${esc(n.prompt)}</pre><button class="cp" id="cp">Copier le texte</button><p class="ev" style="margin-top:8px">À coller dans l'outil de ton dev. ${esc(nom)} ne lance rien lui-même.</p></div>`;
+        if (!n.nonVerifie && n.origine !== "depot") h += `<p class="ev">Proposition de l'outil, déduite de ta description.${projet.depot?.sha ? "" : " Elle sera vérifiée dans le dépôt quand il sera connecté."}</p>`;
       }
-      if (n.origine === "depot") h += `<p class="ev">Trouvé dans le dépôt : cette case ne vient pas de votre description.</p>`;
+      if (n.origine === "depot") h += `<p class="ev">Trouvé dans le dépôt : cette case ne vient pas de ta description.</p>`;
       h += listePreuves(n);
       if (!projet.lecture?.enCours) h += `<details class="ev" id="cor"><summary>Corriger cette case</summary><div class="cor">
         <label>État<select id="cor-etat">${Object.keys(LABEL).map((e) => `<option value="${e}"${e === n.etat ? " selected" : ""}>${LABEL[e]}</option>`).join("")}</select></label>
@@ -231,7 +231,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
         <label>À quoi ça sert<textarea id="cor-sert" rows="3" maxlength="400">${esc(n.aQuoiCaSert)}</textarea></label>
         <div id="cor-msg"></div>
         <div class="row-tags"><button class="cp" id="cor-ok" data-id="${n.id}">Enregistrer ma correction</button>${n.corrige ? `<button class="cp ghost" id="cor-non" data-id="${n.id}">Annuler ma correction</button>` : ""}</div>
-        <p>Votre correction est gardée quand vous mettez la carte à jour. La fiche continue d'afficher ce que l'outil a lu dans le dépôt.</p></div></details>`;
+        <p>Ta correction est gardée quand tu mets la carte à jour. La fiche continue d'afficher ce que l'outil a lu dans le dépôt.</p></div></details>`;
     }
     const fam = sel[0] === "f" || sel[0] === "s" ? COULEURS[parseInt(sel.slice(1)) % COULEURS.length] : null;
     el.style.setProperty("--fc", fam ? fam[0] : "#1b1f2a"); el.style.setProperty("--ft", fam ? fam[1] : "#f2f4f7");
@@ -240,7 +240,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
     const cp = el.querySelector("#cp");
     if (cp) cp.onclick = () => {
       const pre = el.querySelector("#pr");
-      const repli = () => { const r = document.createRange(); r.selectNodeContents(pre); const g = getSelection(); g.removeAllRanges(); g.addRange(r); cp.textContent = "Texte sélectionné : copiez-le"; };
+      const repli = () => { const r = document.createRange(); r.selectNodeContents(pre); const g = getSelection(); g.removeAllRanges(); g.addRange(r); cp.textContent = "Texte sélectionné : copie-le"; };
       try { navigator.clipboard.writeText(pre.textContent).then(() => { cp.textContent = "Copié"; }, repli); } catch { repli(); }
     };
     const go = el.querySelector("#gh-go");
@@ -259,7 +259,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
       try {
         projet = await api(`/projets/${projet.id}/ajuster`, { reponses, remarque: el.querySelector("#aff-rem").value });
         arbre = projet.arbre; F = arbre.familles; render();
-        el.querySelector("#aff-msg").innerHTML = `<p class="ev">Arbre ajusté.${projet.depot?.sha ? " Pour vérifier les nouvelles cases dans le dépôt, cliquez sur « Mettre à jour »." : ""}</p>`;
+        el.querySelector("#aff-msg").innerHTML = `<p class="ev">Carte ajustée.${projet.depot?.sha ? " Pour vérifier les nouvelles cases dans le dépôt, clique sur « Mettre à jour »." : ""}</p>`;
       } catch (e) { aff.disabled = false; msg.innerHTML = `<p class="dr">${esc(e.message)}</p>`; }
     };
     const maj = el.querySelector("#gh-maj");
@@ -319,7 +319,7 @@ export function monterCarte(racine, projet, { etat, api, sortir, supprimer }) {
     mode.textContent = vueListe ? "Voir la carte" : "Voir la liste";
     mode.setAttribute("aria-pressed", String(vueListe));
     const reste = (projet.questions ?? []).filter((_, i) => !projet.reponses?.[i]?.trim()).length;
-    $("#aff").innerHTML = `<span>Ajuster l'arbre</span>${reste ? `<i>${reste}</i>` : ""}`;
+    $("#aff").innerHTML = `<span>Ajuster la carte</span>${reste ? `<i>${reste}</i>` : ""}`;
     $("#aff").hidden = !!l?.enCours; $("#aff").setAttribute("aria-pressed", sel === "affiner");
   }
   async function mettreAJour() {

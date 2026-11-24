@@ -67,17 +67,17 @@ export function apresLecture(avant: Arbre, apres: Arbre, lectureDavant: string |
       c.corrige = cor; c.etatLu = c.etat; c.etat = cor.etat ?? c.etat;
     }
     const nom = `« ${c.titre} »`;
-    if (!vieille) { if (c.origine === "depot") lignes.push(`Trouvé dans le dépôt, sans être dans votre description : ${nom}.`); continue; }
+    if (!vieille) { if (c.origine === "depot") lignes.push(`Trouvé dans le dépôt, sans être dans ta description : ${nom}.`); continue; }
     if (lu(vieille) !== lu(c)) {
-      lignes.push(`${nom} : ${NOM[lu(vieille)]} → ${NOM[lu(c)]}.${cor?.etat ? ` Votre correction (${NOM[cor.etat]}) est conservée.` : ""}`);
+      lignes.push(`${nom} : ${NOM[lu(vieille)]} → ${NOM[lu(c)]}.${cor?.etat ? ` Ta correction (${NOM[cor.etat]}) est conservée.` : ""}`);
     } else if (vieille.nonVerifie && !c.nonVerifie) lignes.push(`${nom} : l'outil a maintenant de quoi trancher (${NOM[lu(c)]}).`);
     else if (!vieille.nonVerifie && c.nonVerifie) lignes.push(`${nom} : l'outil n'arrive plus à trancher, la case passe en « non vérifié ».`);
-    if (!vieille.ecart && c.ecart) lignes.push(`Nouvel écart avec votre description sur ${nom} : ${c.ecart.constat}`);
+    if (!vieille.ecart && c.ecart) lignes.push(`Nouvel écart avec ta description sur ${nom} : ${c.ecart.constat}`);
     if (vieille.ecart && !c.ecart) lignes.push(`L'écart signalé sur ${nom} a disparu.`);
   }
   for (const c of duDepot.values()) {
     if (retrouvees.has(c)) continue;
-    lignes.push(`N'apparaît plus dans le dépôt : « ${c.titre} ».${c.corrige ? " Votre correction sur cette case n'a pas pu être reportée." : ""}`);
+    lignes.push(`N'apparaît plus dans le dépôt : « ${c.titre} ».${c.corrige ? " Ta correction sur cette case n'a pas pu être reportée." : ""}`);
   }
   return lectureDavant ? { depuis: lectureDavant, lignes } : null;
 }

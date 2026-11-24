@@ -31,11 +31,11 @@ export class DepotGitHub implements Depot {
     const r = await fetch(`${this.api}${chemin}`, {
       method: "GET",
       headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "carte-produit", ...(this.jeton ? { Authorization: `Bearer ${this.jeton}` } : {}) },
-    }).catch(() => { throw new ErreurDepot("Impossible de joindre GitHub. Réessayez."); });
-    if (r.status === 401) throw new ErreurDepot("GitHub refuse ce jeton. Vérifiez qu'il est bien copié et qu'il n'a pas expiré.");
-    if (r.status === 404) throw new ErreurDepot("Dépôt introuvable. Vérifiez son nom, et que le jeton y donne accès.");
-    if (r.status === 429 || (r.status === 403 && r.headers.get("x-ratelimit-remaining") === "0")) throw new ErreurDepot("GitHub limite le nombre de lectures pour l'instant. Réessayez dans quelques minutes.");
-    if (r.status === 403) throw new ErreurDepot("GitHub refuse l'accès à ce dépôt. Vérifiez que le jeton autorise la lecture du contenu et des demandes de fusion.");
+    }).catch(() => { throw new ErreurDepot("Impossible de joindre GitHub. Réessaie."); });
+    if (r.status === 401) throw new ErreurDepot("GitHub refuse cet accès. Vérifie qu'il est bien copié et qu'il n'a pas expiré.");
+    if (r.status === 404) throw new ErreurDepot("Dépôt introuvable. Vérifie son nom, et que l'accès y donne le droit de lire.");
+    if (r.status === 429 || (r.status === 403 && r.headers.get("x-ratelimit-remaining") === "0")) throw new ErreurDepot("GitHub limite le nombre de lectures pour l'instant. Réessaie dans quelques minutes.");
+    if (r.status === 403) throw new ErreurDepot("GitHub refuse l'accès à ce dépôt. Vérifie que l'accès autorise la lecture du contenu et des demandes de fusion.");
     if (!r.ok) throw new ErreurDepot(`GitHub a répondu par une erreur (code ${r.status}).`);
     return r.json();
   }
