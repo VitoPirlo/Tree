@@ -3,8 +3,7 @@
 export const NOM_PRODUIT = "Mycelium";
 
 /**
- * Textes de la page d'accueil, regroupés ici pour les remplacer d'un coup.
- * Version provisoire, au tutoiement : les textes définitifs ne sont pas encore arrivés.
+ * Textes définitifs de la page d'accueil. Tout se remplace ici.
  */
 export const ACCUEIL = {
   phrase: "Vois où en est ton produit. Et ton dev.",
@@ -54,7 +53,7 @@ export const ACCUEIL = {
     ["Qui peut voir mes projets ?", "Chaque accès ne voit que ses propres projets. L'accès GitHub et tes projets restent sur le serveur, visibles seulement par toi."],
   ] as const,
   faqEssaiQuestion: "C'est quoi une action d'essai ?",
-  ctaTitre: "À toi de jouer",
+  ctaTitre: "À toi de jouer.",
   ctaIntro: "Crée un accès, décris ton produit, et vois ta première carte pousser.",
 };
 
